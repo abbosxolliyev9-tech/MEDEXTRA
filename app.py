@@ -1,71 +1,66 @@
 import streamlit as st
 import pandas as pd
+import io
 
-# 1. Sayt sozlamalari va Login tizimi
-st.set_page_config(page_title="Narx Avtomatizatori", layout="wide")
+st.set_page_config(page_title="MEDEXTRA | Excel Pro", layout="wide")
 
-# Oddiy xavfsizlik (Login: admin, Parol: 12345) - buni o'zgartirishingiz mumkin
-def check_password():
-    if "password_correct" not in st.session_state:
-        st.session_state.password_correct = False
+# Parol tizimi
+if "auth" not in st.session_state:
+    st.session_state.auth = False
 
-    if not st.session_state.password_correct:
-        st.title("Tizimga kirish")
+if not st.session_state.auth:
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.title("🔐 Kirish")
         user = st.text_input("Login")
-        pwd = st.text_input("Parol", type="password")
+        pw = st.text_input("Parol", type="password")
         if st.button("Kirish"):
-            if user == "admin" and pwd == "12345": # O'zingizga yoqqanini qo'ying
-                st.session_state.password_correct = True
+            if user == "admin" and pw == "12345":
+                st.session_state.auth = True
                 st.rerun()
             else:
-                st.error("Login yoki parol xato!")
-        return False
-    return True
+                st.error("Xato!")
+else:
+    st.title("💊 MEDEXTRA: Excel Avtomatizatsiya")
+    
+    with st.sidebar:
+        st.header("⚙️ Hisob qoidalari")
+        pct = st.number_input("Ustama foizi (%)", min_value=0, max_value=100, value=15)
+        st.write("G ustun: Foiz")
+        st.write("H ustun: Umumiy summa")
+        st.write("I ustun: Donasi (Narxi)")
 
-if check_password():
-    st.sidebar.title("Sozlamalar")
-    st.title("🚀 Narxlarni avtomatik shakllantirish")
-    
-    # 2. Ustama foizlarini belgilash
-    min_pct = st.sidebar.number_input("Minimal ustama (%)", value=12.0)
-    max_pct = st.sidebar.number_input("Maximal ustama (%)", value=17.0)
-    
-    # 3. Fayl yuklash
-    uploaded_file = st.file_uploader("Excel faylni (XLSX) yuklang", type=['xlsx'])
+    uploaded_file = st.file_uploader("Excel faylni yuklang", type=['xlsx'])
 
     if uploaded_file:
         df = pd.read_excel(uploaded_file)
         
-        # Ustunlarni avtomatik qidirish
-        st.info("Jadval yuklandi. Narx ustunini tanlang.")
-        cost_col = st.selectbox("Sotib olingan narx ustuni:", df.columns)
-        
-        if st.button("Hisoblashni boshlash"):
-            # O'rtacha foizni olish (masalan 15%)
-            avg_pct = (min_pct + max_pct) / 2
+        # Ustunlar borligini tekshirish (D ustuni 'Cena' ekan rasmda)
+        # Ekranda 4-ustun (D) narx ekanini ko'ryapman
+        try:
+            # 1. G katak: Necha foiz qo'yilgani
+            df['Ustama %'] = pct
             
-            # Narxni hisoblash
-            df['Yangi Narx'] = df[cost_col] * (1 + avg_pct / 100)
+            # 2. H katak: Foiz qo'yilgandagi umumiy narxi (Narx * miqdor * foiz)
+            # Rasmda: D ustuni (Cena), C ustuni (Kolichestvo)
+            df['Umumiy Sotuv summasi'] = (df.iloc[:, 3] * df.iloc[:, 2] * (1 + pct/100)).apply(lambda x: round(x / 100) * 100)
             
-            # 100 so'mga yaxlitlash logikasi
-            def round_to_100(x):
-                return round(x / 100) * 100
+            # 3. I katak: Dorining donasini sotuv narxi
+            df['Dona sotuv narxi'] = (df.iloc[:, 3] * (1 + pct/100)).apply(lambda x: round(x / 100) * 100)
             
-            df['Yakuniy Sotuv Narxi'] = df['Yangi Narx'].apply(round_to_100)
-            df['Ustama (%)'] = avg_pct
-            df['Foyda (so\'m)'] = df['Yakuniy Sotuv Narxi'] - df[cost_col]
+            st.success("Hisoblandi! G, H va I ustunlari shakllantirildi.")
+            st.dataframe(df)
 
-            st.success("Muvaffaqiyatli hisoblandi!")
-            st.dataframe(df.head(10)) # Oldindan ko'rish
-
-            # Faylni saqlash va yuklab olish
-            file_name = "tayyor_narxlar.xlsx"
-            df.to_excel(file_name, index=False)
+            # Faylni yuklab olish uchun tayyorlash
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='Hisobot')
             
-            with open(file_name, "rb") as f:
-                st.download_button(
-                    label="📥 Tayyor Excel faylni yuklab olish",
-                    data=f,
-                    file_name="hisoblangan_narxlar.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            st.download_button(
+                label="📥 Tayyor Excelni yuklab olish",
+                data=output.getvalue(),
+                file_name="medextra_tayyor.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        except Exception as e:
+            st.error(f"Xatolik: Excel formati mos kelmadi. Ustunlarni tekshiring! {e}")
