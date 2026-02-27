@@ -9,8 +9,8 @@ st.set_page_config(page_title="MEDEXTRA", layout="wide")
 
 # Фойдаланувчи маълумотлари
 names = ['Administrator']
-usernames = ['admin']
-passwords = ['admin123'] # Паролингиз
+usernames = ['apteka']
+passwords = ['+-456'] # Паролингиз
 
 # Хавфсиз текширув тизимини созлаш
 authenticator = stauth.Authenticate(
