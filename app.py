@@ -9,8 +9,8 @@ st.set_page_config(page_title="MEDEXTRA", layout="wide")
 
 # Фойдаланувчи маълумотлари
 names = ['Administrator']
-usernames = ['apteka']
-passwords = ['+-456'] # Паролингиз
+usernames = ['admin']
+passwords = ['admin123'] # Паролингиз
 
 # Хавфсиз текширув тизимини созлаш
 authenticator = stauth.Authenticate(
@@ -21,7 +21,6 @@ authenticator = stauth.Authenticate(
 )
 
 # Логин ойнаси
-# Изоҳ: янги версияларда Hasher ишлатиш мажбурий эмас, оддий матнли парол ҳам бўлади
 name, authentication_status, username = authenticator.login('Кириш', 'main')
 
 if authentication_status == False:
