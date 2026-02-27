@@ -9,7 +9,7 @@ st.set_page_config(page_title="MEDEXTRA", page_icon="💊", layout="wide")
 
 # 2. ДИЗАЙН (CSS) - МАТНЛАРНИ ОҚ БЛОК ИЧИГА ОЛИШ
 def add_custom_style():
-    bg_image_url = "https://raw.githubusercontent.com/abbosxolliyev9-tech/MEDEXTRA/main/unnamed.jpg"
+    bg_image_url =https://github.com/abbosxolliyev9-tech/MEDEXTRA/blob/main/pexels-eren-34577902.jpg
     
     st.markdown(
         f"""
