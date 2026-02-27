@@ -3,37 +3,42 @@ import pandas as pd
 import io
 import re
 import math
-import streamlit_authenticator as stauth
 
+# 1. Саҳифа созламалари
 st.set_page_config(page_title="MEDEXTRA", layout="wide")
 
-# Фойдаланувчи маълумотлари
-names = ['Administrator']
-usernames = ['admin']
-passwords = ['admin123'] # Паролингиз
+# 2. Логин функцияси (Оддий ва хатосиз)
+def check_password():
+    def password_entered():
+        if st.session_state["password"] == "admin123" and st.session_state["user"] == "admin":
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+            del st.session_state["user"]
+        else:
+            st.session_state["password_correct"] = False
 
-# Хавфсиз текширув тизимини созлаш
-authenticator = stauth.Authenticate(
-    {'usernames': {usernames[0]: {'name': names[0], 'password': passwords[0]}}},
-    'medextra_cookie',
-    'medextra_key',
-    30
-)
+    if "password_correct" not in st.session_state:
+        st.title("🔐 MEDEXTRA Тизими")
+        st.text_input("Логин", key="user")
+        st.text_input("Парол", type="password", key="password")
+        st.button("Кириш", on_click=password_entered)
+        return False
+    elif not st.session_state["password_correct"]:
+        st.title("🔐 MEDEXTRA Тизими")
+        st.text_input("Логин", key="user")
+        st.text_input("Парол", type="password", key="password")
+        st.button("Кириш", on_click=password_entered)
+        st.error("❌ Логин ёки парол хато!")
+        return False
+    else:
+        return True
 
-# Логин ойнаси
-name, authentication_status, username = authenticator.login('Кириш', 'main')
+# 3. Агар парол тўғри бўлса, асосий қисмни кўрсатиш
+if check_password():
+    st.sidebar.button("Тизимдан чиқиш", on_click=lambda: st.session_state.clear())
+    st.title("💊 MEDEXTRA: Professional Hisob-Kitob")
 
-if authentication_status == False:
-    st.error('Логин ёки парол хато')
-elif authentication_status == None:
-    st.info('Тизимдан фойдаланиш учун логин ва паролни киритинг')
-elif authentication_status:
-    # --- ТИЗИМНИНГ ИЧКИ ҚИСМИ ---
-    authenticator.logout('Чиқиш', 'sidebar')
-    st.sidebar.success(f"Хуш келибсиз, {name}")
-    
-    st.title("💊 MEDEXTRA: Aqlli Narx Tizimi")
-
+    # Сизнинг идеал ишловчи формулангиз
     def get_pack_size(name):
         match = re.search(r'[N№](\d+)', str(name).upper())
         return int(match.group(1)) if match else 1
