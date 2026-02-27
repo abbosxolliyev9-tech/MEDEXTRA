@@ -4,45 +4,26 @@ import io
 import re
 import math
 import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
 
-# 1. Саҳифа созламалари
-st.set_page_config(page_title="MEDEXTRA | Тизимга кириш", layout="wide")
+st.set_page_config(page_title="MEDEXTRA", layout="wide")
 
-# 2. Фойдаланувчилар маълумотлар базаси (Вақтинчалик шу ерда)
-# Паролни "хеш"ланган ҳолатда сақлаш хавфсизроқ
-# Бу ерда: логин - admin, парол - admin123
-config = {
-    'credentials': {
-        'usernames': {
-            'admin': {
-                'name': 'Administrator',
-                'password': 'abc', # Бу ерда 'abc' хешланади
-                'email': 'admin@medextra.uz'
-            }
-        }
-    },
-    'cookie': {
-        'expiry_days': 30,
-        'key': 'some_signature_key',
-        'name': 'some_cookie_name'
-    }
-}
+# 1. Фойдаланувчи маълумотлари
+# Парол бу сафар тўғридан-тўғри текшириладиган қилиб соддалаштирилди
+names = ['Administrator']
+usernames = ['admin']
+passwords = ['admin123'] # Сизнинг паролингиз
 
-# Паролни хавфсиз қилиш (Сизнинг паролингиз: admin123)
-# Бу қисм паролни код ичида очиқ кўринмаслиги учун керак
-hashed_passwords = stauth.Hasher(['admin123']).generate()
-config['credentials']['usernames']['admin']['password'] = hashed_passwords[0]
+# Паролларни хавфсиз форматга ўтказиш (янги усул)
+hashed_passwords = stauth.Hasher(passwords).generate()
 
 authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days']
+    {'usernames': {usernames[0]: {'name': names[0], 'password': hashed_passwords[0]}}},
+    'medextra_cookie',
+    'medextra_key',
+    30
 )
 
-# 3. Логин ойнасини чиқариш
+# 2. Логин ойнаси
 name, authentication_status, username = authenticator.login('Кириш', 'main')
 
 if authentication_status == False:
@@ -50,12 +31,13 @@ if authentication_status == False:
 elif authentication_status == None:
     st.warning('Илтимос, логин ва паролни киритинг')
 elif authentication_status:
-    # --- ТИЗИМ ИЧИДА ---
+    # ТИЗИМ ИЧИДА
     authenticator.logout('Чиқиш', 'sidebar')
-    st.sidebar.title(f"Хуш келибсиз, {name}")
+    st.sidebar.success(f"Хуш келибсиз, {name}")
     
     st.title("💊 MEDEXTRA: Professional Hisob-Kitob")
 
+    # Сизнинг идеал ишловчи формулангиз
     def get_pack_size(name):
         match = re.search(r'[N№](\d+)', str(name).upper())
         return int(match.group(1)) if match else 1
@@ -63,7 +45,7 @@ elif authentication_status:
     def calculate_prices(cost, pack_size):
         pachka_raw = cost * 1.12
         pachka_final = math.ceil(pachka_raw / 100) * 100
-        dona_raw = pachka_final / pack_size
+        dona_raw = pachka_final / (pack_size if pack_size > 0 else 1)
         dona_final = math.ceil(dona_raw / 100) * 100
         return pachka_final, dona_final
 
@@ -75,13 +57,14 @@ elif authentication_status:
         col_name = st.selectbox("Dori nomi (A):", cols, index=0)
         col_cost = st.selectbox("Tannarx (D):", cols, index=3 if len(cols)>3 else 0)
         
-        if st.button("🚀 Formulani ishga tushirish"):
+        if st.button("🚀 Hisoblashni boshlash"):
             pachka_list, dona_list = [], []
             for _, row in df.iterrows():
                 try:
                     val = str(row[col_cost]).replace(' ', '').replace(',', '.')
                     cost = float(re.sub(r'[^\d.]', '', val))
                 except: cost = 0
+                
                 size = get_pack_size(row[col_name])
                 p_price, d_price = calculate_prices(cost, size)
                 pachka_list.append(p_price)
