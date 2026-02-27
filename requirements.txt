@@ -1,4 +1,4 @@
 pandas
 xlsxwriter
 openpyxl
-streamlit-authenticator
+streamlit-authenticator==0.2.3
