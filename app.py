@@ -8,18 +8,25 @@ st.set_page_config(page_title="MEDEXTRA", layout="wide")
 st.title("💊 MEDEXTRA: Aqlli Narx Tizimi")
 
 def get_pack_size(name):
-    match = re.search(r'[N№](\d+)', str(name).upper())
-    return int(match.group(1)) if match else 1
+    """Dori nomidan faqat № yoki N dan keyingi dona sonini topish"""
+    name_str = str(name).upper()
+    # № yoki N harfidan keyin kelgan raqamlarni qidiramiz
+    match = re.search(r'[N№](\d+)', name_str)
+    if match:
+        return int(match.group(1))
+    return 1 # Agar N yo'q bo'lsa, dori 1 dona deb hisoblanadi
 
 def find_smart_price(base_price, pack_size):
     unit_cost = base_price / (pack_size if pack_size > 0 else 1)
-    # 12% dan 18% gacha chiroyli narx qidirish
+    
+    # 1. 12% dan 18% gacha chiroyli narx qidirish
     for p in range(120, 181):
         pct = p / 10.0
         sale_price = unit_cost * (1 + pct / 100)
         if round(sale_price, 2) % 100 == 0:
             return pct, int(sale_price)
-    # Topilmasa, 12% qo'shib faqat TEPAGA 100 ga yaxlitlash
+            
+    # 2. Topilmasa, 12% qo'shib TEPAGA 100 ga yaxlitlash
     final_price = math.ceil((unit_cost * 1.12) / 100) * 100
     return 12.0, int(final_price)
 
@@ -38,8 +45,10 @@ if uploaded_file:
                 raw_p = str(row[col_d]).replace(' ', '').replace(',', '.')
                 price = float(re.sub(r'[^\d.]', '', raw_p))
             except: price = 0
+            
             size = get_pack_size(row[col_a])
             pct, unit_p = find_smart_price(price, size)
+            
             p_list.append(pct)
             i_list.append(unit_p)
             h_list.append(unit_p * size)
@@ -52,4 +61,4 @@ if uploaded_file:
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df.to_excel(writer, index=False)
-        st.download_button("📥 Yuklab olish", output.getvalue(), "hisobot.xlsx")
+        st.download_button("📥 Yuklab olish", output.getvalue(), "medextra_tayyor.xlsx")
