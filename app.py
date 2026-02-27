@@ -7,17 +7,28 @@ import math
 # 1. Саҳифа созламалари
 st.set_page_config(page_title="MEDEXTRA", page_icon="💊", layout="centered")
 
-# 2. Математик функциялар
+# 2. МАТЕМАТИК ФУНКЦИЯЛАР (ТУЗАТИЛГАН ВАРИАНТ)
 def get_pack_size(name):
     match = re.search(r'[N№](\d+)', str(name).upper())
     return int(match.group(1)) if match else 1
 
 def calculate_prices(cost, pack_size):
+    # Пачка нархини чиқариш (Таннарх + 12% устама ва юзликка яхлитлаш)
+    # Масалан: 10 500 * 1.12 = 11 760 -> 11 800 сўм
     pachka_final = math.ceil((cost * 1.12) / 100) * 100
-    dona_final = math.ceil((pachka_final / (pack_size if pack_size > 0 else 1)) / 100) * 100
+    
+    # Дона нархини ҳисоблаш
+    # Пачка нархини ичидаги сонига бўламиз ва чиққан сонни ҳам юзликка яхлитлаймиз
+    # Шунда дона нархи ҳам "хунук" чиқмайди
+    if pack_size > 1:
+        dona_raw = pachka_final / pack_size
+        dona_final = math.ceil(dona_raw / 100) * 100
+    else:
+        dona_final = pachka_final
+        
     return pachka_final, dona_final
 
-# 3. ДИЗАЙН (CSS) - Кўк фонли стиллар
+# 3. ДИЗАЙН (Сизга ёққан кўк блокли вариант)
 def add_custom_style():
     bg_image_url = "https://raw.githubusercontent.com/abbosxolliyev9-tech/MEDEXTRA/main/pexels-eren-34577902.jpg"
     st.markdown(
@@ -28,8 +39,6 @@ def add_custom_style():
             background-size: cover;
             background-position: center;
         }}
-        
-        /* Кўк фонли лейбллар */
         .blue-label {{
             background-color: #004a99;
             color: white !important;
@@ -39,8 +48,6 @@ def add_custom_style():
             font-weight: bold;
             margin-bottom: 5px;
         }}
-        
-        /* Кириш тугмаси */
         .stButton>button {{
             background-color: #004a99 !important;
             color: white !important;
@@ -48,8 +55,6 @@ def add_custom_style():
             font-weight: bold !important;
             height: 3em !important;
         }}
-
-        /* Пастки кўк блок */
         .footer-box {{
             background-color: #004a99;
             color: white !important;
@@ -58,8 +63,6 @@ def add_custom_style():
             margin-top: 20px;
             text-align: center;
         }}
-        
-        /* Input устидаги ёзувлар */
         .stTextInput label {{
             background-color: #004a99 !important;
             color: white !important;
@@ -73,7 +76,7 @@ def add_custom_style():
 
 add_custom_style()
 
-# 4. ЛОГИН ТИЗИМИ (Янгиланган логин ва парол)
+# 4. ЛОГИН ТИЗИМИ
 if "password_correct" not in st.session_state:
     st.session_state["password_correct"] = False
 
@@ -81,7 +84,6 @@ if not st.session_state["password_correct"]:
     col1, col2, col3 = st.columns([0.1, 1, 0.1])
     with col2:
         st.write("<br><br>", unsafe_allow_html=True)
-        
         st.markdown('<div class="blue-label" style="font-size: 30px;">💊 MEDEXTRA</div>', unsafe_allow_html=True)
         st.markdown('<br><div class="blue-label">Фармацевтика тизимига кириш</div>', unsafe_allow_html=True)
         
@@ -89,7 +91,6 @@ if not st.session_state["password_correct"]:
         password_input = st.text_input("Парол", type="password", placeholder="****")
         
         if st.button("ТИЗИМГА КИРИШ", use_container_width=True):
-            # ШУ ЕРДА ЯНГИ ПАРОЛ ЎРНАТИЛДИ
             if user_input == "admin" and password_input == "Abbos96":
                 st.session_state["password_correct"] = True
                 st.rerun()
@@ -130,14 +131,21 @@ if uploaded_files:
                 p_list, d_list = [], []
                 for _, row in df.iterrows():
                     try:
+                        # Таннархни тозалаш
                         val = str(row[col_cost]).replace(' ', '').replace(',', '.')
                         cost = float(re.sub(r'[^\d.]', '', val))
+                        
+                        # Ичидаги сонини топиш
                         size = get_pack_size(row[col_name])
+                        
+                        # Нархларни ҳисоблаш
                         p_p, d_p = calculate_prices(cost, size)
+                        
                         p_list.append(p_p)
                         d_list.append(d_p)
                     except:
-                        p_list.append(0); d_list.append(0)
+                        p_list.append(0)
+                        d_list.append(0)
                 
                 df['Pachka Sotuv'] = p_list
                 df['Dona Narxi'] = d_list
