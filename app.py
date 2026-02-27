@@ -4,10 +4,10 @@ import io
 import re
 import math
 
-# 1. САҲИФА СОЗЛАМАЛАРИ
-st.set_page_config(page_title="MEDEXTRA", page_icon="💊", layout="wide")
+# 1. Саҳифа созламалари
+st.set_page_config(page_title="MEDEXTRA", page_icon="💊", layout="centered")
 
-# 2. МАТЕМАТИК ФУНКЦИЯЛАР (NameError бермаслиги учун энг тепада)
+# 2. Математик функциялар (Тепада туриши шарт)
 def get_pack_size(name):
     match = re.search(r'[N№](\d+)', str(name).upper())
     return int(match.group(1)) if match else 1
@@ -17,58 +17,54 @@ def calculate_prices(cost, pack_size):
     dona_final = math.ceil((pachka_final / (pack_size if pack_size > 0 else 1)) / 100) * 100
     return pachka_final, dona_final
 
-# 3. ДИЗАЙН (CSS) - ҲАММА НАРСАНИ ОҚ БЛОК ИЧИГА ОЛИШ
+# 3. ДИЗАЙН (CSS) - Сиз юборган расмдагидек кўк фонли ёзувлар
 def add_custom_style():
-    # Орқа фон учун сиз танлаган тоғли манзара (pexels-eren-34577902.jpg)
     bg_image_url = "https://raw.githubusercontent.com/abbosxolliyev9-tech/MEDEXTRA/main/pexels-eren-34577902.jpg"
     st.markdown(
         f"""
         <style>
-        /* Орқа фон созламаси */
         .stApp {{
             background-image: url("{bg_image_url}");
-            background-attachment: fixed;
             background-size: cover;
             background-position: center;
         }}
         
-        /* КИРИШ ОЙНАСИ (ОҚ ТЎРТБУРЧАК) */
-        .login-card {{
-            background-color: rgba(255, 255, 255, 0.98);
-            padding: 40px;
-            border-radius: 25px;
-            box-shadow: 0px 20px 40px rgba(0,0,0,0.5);
-            max-width: 450px;
-            margin: auto;
-            text-align: center;
-            border: 1px solid #ddd;
+        /* Лого ва ёзувлар учун кўк фон */
+        .blue-label {{
+            background-color: #004a99;
+            color: white !important;
+            padding: 5px 15px;
+            border-radius: 5px;
+            display: inline-block;
+            font-weight: bold;
+            margin-bottom: 5px;
         }}
         
-        /* Логин ва Парол ёзувларини тўқ ва аниқ қилиш */
-        .stTextInput label {{
-            color: #1a1a1a !important;
-            font-weight: bold !important;
-            font-size: 16px !important;
-            display: flex;
-        }}
-        
-        /* Тугма дизайни */
+        /* Кириш тугмаси */
         .stButton>button {{
             background-color: #004a99 !important;
             color: white !important;
+            border-radius: 10px !important;
             font-weight: bold !important;
-            border-radius: 12px !important;
-            height: 3.5em !important;
+            height: 3em !important;
+        }}
+
+        /* Маълумот олиш учун пастки кўк блок */
+        .footer-box {{
+            background-color: #004a99;
+            color: white !important;
+            padding: 10px;
+            border-radius: 5px;
             margin-top: 20px;
+            text-align: center;
         }}
         
-        /* Боғланиш қисми учун стиль */
-        .contact-box {{
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            color: #444;
-            font-size: 14px;
+        /* Input устидаги ёзувлар */
+        .stTextInput label {{
+            background-color: #004a99 !important;
+            color: white !important;
+            padding: 2px 10px !important;
+            border-radius: 3px !important;
         }}
         </style>
         """, 
@@ -78,94 +74,79 @@ def add_custom_style():
 add_custom_style()
 
 # 4. ЛОГИН ТИЗИМИ
-def check_password():
-    def password_entered():
-        if st.session_state["password"] == "admin123" and st.session_state["user"] == "admin":
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]
-            del st.session_state["user"]
-        else:
-            st.session_state["password_correct"] = False
+if "password_correct" not in st.session_state:
+    st.session_state["password_correct"] = False
 
-    if "password_correct" not in st.session_state:
-        st.write("<br><br><br>", unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([1, 1.2, 1])
-        with col2:
-            # --- ОҚ ТЎРТБУРЧАК БОШЛАНИШИ ---
-            st.markdown('<div class="login-card">', unsafe_allow_html=True)
-            
-            st.markdown("<h1 style='color: #004a99; margin-bottom: 0;'>💊 MEDEXTRA</h1>", unsafe_allow_html=True)
-            st.markdown("<p style='color: #555; margin-bottom: 20px;'>Фармацевтика тизимига кириш</p>", unsafe_allow_html=True)
-            
-            st.text_input("Логин", key="user")
-            st.text_input("Парол", type="password", key="password")
-            
-            st.button("ТИЗИМГА КИРИШ", use_container_width=True, on_click=password_entered)
-            
-            if "password_correct" in st.session_state and not st.session_state["password_correct"]:
-                st.error("❌ Логин ёки парол хато!")
-            
-            # Сиз сўраган боғланиш маълумоти (Оқ блок ичида)
-            st.markdown(
-                """
-                <div class="contact-box">
-                    Ушбу тизимдан фойдаланиш учун биз билан боғланинг:<br>
-                    <b style="color: #004a99; font-size: 16px;">📞 +998 88 754 98 96</b>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-            # --- ОҚ ТЎРТБУРЧАК ТУГАШИ ---
-            
-        return False
-    return True
+if not st.session_state["password_correct"]:
+    # Марказга текислаш
+    col1, col2, col3 = st.columns([0.1, 1, 0.1])
+    with col2:
+        st.write("<br><br>", unsafe_allow_html=True)
+        
+        # Логотип қисми
+        st.markdown('<div class="blue-label" style="font-size: 30px;">💊 MEDEXTRA</div>', unsafe_allow_html=True)
+        st.markdown('<br><div class="blue-label">Фармацевтика тизимига кириш</div>', unsafe_allow_html=True)
+        
+        user = st.text_input("Логин", placeholder="admin")
+        password = st.text_input("Парол", type="password", placeholder="****")
+        
+        if st.button("ТИЗИМГА КИРИШ", use_container_width=True):
+            if user == "admin" and password == "admin123":
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else:
+                st.error("❌ Хато!")
+        
+        # Боғланиш қисми
+        st.markdown(
+            """
+            <div class="footer-box">
+                Ушбу тизимдан фойдаланиш учун биз билан боғланинг:<br>
+                <span style="font-size: 18px;">📞 +998 88 754 98 96</span>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+    st.stop()
 
-# 5. АСОСИЙ ҚИСМ (Бир вақтда кўп файллар билан ишлаш)
-if check_password():
-    with st.sidebar:
-        st.markdown("### 👨‍💼 Админ")
-        if st.button("🚪 Чиқиш"):
-            st.session_state.clear()
-            st.rerun()
+# 5. АСОСИЙ ИШЧИ ПАНЕЛЬ
+if st.sidebar.button("🚪 Чиқиш"):
+    st.session_state["password_correct"] = False
+    st.rerun()
 
-    st.markdown("<h1 style='color: white; text-shadow: 3px 3px 10px black; text-align: center;'>📋 Файлларни ҳисоблаш</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='color: white; text-shadow: 2px 2px 8px black; text-align: center;'>📋 Ҳисоб-китоб панели</h1>", unsafe_allow_html=True)
 
-    uploaded_files = st.file_uploader("📂 Excel файлларини танланг", type=['xlsx'], accept_multiple_files=True)
+uploaded_files = st.file_uploader("📂 Excel файлларни юкланг", type=['xlsx'], accept_multiple_files=True)
 
-    if uploaded_files:
-        for i, file in enumerate(uploaded_files):
-            with st.expander(f"📄 Файл: {file.name}", expanded=True):
-                df = pd.read_excel(file)
-                cols = df.columns.tolist()
-                
-                c1, c2 = st.columns(2)
-                with c1:
-                    col_name = st.selectbox(f"Дори номи ({file.name}):", cols, key=f"n_{i}")
-                with c2:
-                    col_cost = st.selectbox(f"Таннарх ({file.name}):", cols, index=min(3, len(cols)-1), key=f"c_{i}")
-                
-                if st.button(f"🚀 Ҳисоблаш: {file.name}", key=f"b_{i}"):
-                    p_list, d_list = [], []
-                    for _, row in df.iterrows():
-                        try:
-                            val = str(row[col_cost]).replace(' ', '').replace(',', '.')
-                            cost = float(re.sub(r'[^\d.]', '', val))
-                        except: cost = 0
-                        
+if uploaded_files:
+    for i, file in enumerate(uploaded_files):
+        with st.expander(f"📄 {file.name}"):
+            df = pd.read_excel(file)
+            cols = df.columns.tolist()
+            
+            c1, c2 = st.columns(2)
+            col_name = c1.selectbox(f"Номи", cols, key=f"n_{i}")
+            col_cost = c2.selectbox(f"Таннарх", cols, index=min(3, len(cols)-1), key=f"c_{i}")
+            
+            if st.button(f"Ҳисоблаш", key=f"b_{i}"):
+                p_list, d_list = [], []
+                for _, row in df.iterrows():
+                    try:
+                        val = str(row[col_cost]).replace(' ', '').replace(',', '.')
+                        cost = float(re.sub(r'[^\d.]', '', val))
                         size = get_pack_size(row[col_name])
                         p_p, d_p = calculate_prices(cost, size)
                         p_list.append(p_p)
                         d_list.append(d_p)
-                    
-                    df['Pachka Sotuv (H)'] = p_list
-                    df['Dona Narxi (I)'] = d_list
-                    
-                    st.success(f"✅ {file.name} ҳисобланди!")
-                    st.dataframe(df.head(10)) 
-                    
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        df.to_excel(writer, index=False)
-                    st.download_button(f"📥 Натижани юклаш", output.getvalue(), f"HISOBLANGAN_{file.name}", key=f"dl_{i}", use_container_width=True)
+                    except:
+                        p_list.append(0); d_list.append(0)
+                
+                df['Pachka Sotuv'] = p_list
+                df['Dona Narxi'] = d_list
+                st.success("Ҳисобланди!")
+                st.dataframe(df.head())
+                
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    df.to_excel(writer, index=False)
+                st.download_button("📥 Юклаб олиш", output.getvalue(), f"Tayyor_{file.name}", key=f"d_{i}")
