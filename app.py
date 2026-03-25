@@ -3,83 +3,100 @@ import pandas as pd
 import io
 import re
 import math
-import pdfplumber
-import sqlite3
-import hashlib
-import uuid
 import zipfile
 
-# 1. САҲИФА СОЗЛАМАЛАРИ
-st.set_page_config(page_title="MEDEXTRA PRO", page_icon="💊", layout="centered")
-
-# 2. МАЪЛУМОТЛАР БАЗАСИ (Login учун)
-def init_db():
-    conn = sqlite3.connect('medextra_users.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (phone TEXT PRIMARY KEY, password TEXT, name TEXT, session_id TEXT, status INTEGER)''')
-    admin_pass = hashlib.sha256("Abbos96".encode()).hexdigest()
-    c.execute('INSERT OR IGNORE INTO users VALUES (?,?,?,?,?)', ('admin', admin_pass, 'ADMIN', '', 9))
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# 3. ДОРИХОНА МАНТИҒИ (18% фойда ва 1000/100 сўмлик яхлитлаш)
+# 1. АСОСИЙ МАНТИҚ - СИЗ АЙТГАН ПРИНЦИП АСОСИДА
 def get_pack_size(name):
-    """Дори номидан N ёки № белгисидан кейинги сонни топади"""
     match = re.search(r'[N№](\d+)', str(name).upper())
     return int(match.group(1)) if match else 1
 
 def calculate_prices(cost, pack_size):
-    """Сиз айтган махсус ҳисоблаш алгоритми"""
-    # Максимал чегара - 18% фойда
-    max_allowed = cost * 1.18
+    # Асл таннарх
+    unit_cost = cost / pack_size
+    max_allowed_unit = unit_cost * 1.18  # 18% чегара
     
-    # 1. Аввал 1000 сўмгача ТЕПАГА яхлитлаб кўрамиз
-    # (Одатда 12% устама билан бошланади)
-    pachka_final = math.ceil((cost * 1.12) / 1000) * 1000
+    # Бошланғич устама (12% дан бошлаймиз)
+    target_unit = unit_cost * 1.12
     
-    # 2. Агар 1000 га яхлитлаш 18% дан ошиб кетса
-    if pachka_final > max_allowed:
-        # 18% ичида қоладиган энг катта сонни 100 сўмлик қадам билан топамиз
-        pachka_final = math.floor(max_allowed / 100) * 100
+    # ҚАДАМЛАР БЎЙИЧА ЯХЛИТЛАШ (1000 -> 500 -> 100)
+    # 1-қадам: 1000 сўмга яхлитлаб кўрамиз
+    res_unit = math.ceil(target_unit / 1000) * 1000
     
-    # 3. Дона (штук) нархини ҳисоблаш
-    if pack_size > 1:
-        dona_raw = pachka_final / pack_size
-        # Дона нархини 1000 гача яхлитлаб кўрамиз
-        dona_final = math.ceil(dona_raw / 1000) * 1000
+    if res_unit > max_allowed_unit:
+        # 2-қадам: 500 сўмга яхлитлаб кўрамиз
+        res_unit = math.ceil(target_unit / 500) * 500
         
-        # Агар донани 1000 га яхлитлаш 18% дан ошириб юборса (пачкага нисбатан)
-        # ёки нотабиий қиммат бўлса, 100 сўмлик қадамга ўтамиз
-        if (dona_final * pack_size) > (pachka_final * 1.15):
-            dona_final = math.ceil(dona_raw / 100) * 100
-    else:
-        dona_final = pachka_final
+    if res_unit > max_allowed_unit:
+        # 3-қадам: 100 сўмга яхлитлаб кўрамиз
+        res_unit = math.ceil(target_unit / 100) * 100
         
+    if res_unit > max_allowed_unit:
+        # 4-қадам (ОХИРГИ ЧОРА): 18.99% гача рухсат бериб, 100 сўмлик энг яқин нарх
+        # Агар 11% ёки 18.99% оралиғида бўлса ҳам 100 сўмлик яхлитликни сақлаймиз
+        res_unit = math.floor(max_allowed_unit / 100) * 100
+
+    # Якуний пачка нархи штукка каррали бўлиши шарт!
+    pachka_final = res_unit * pack_size
+    dona_final = res_unit
+    
     real_markup = ((pachka_final / cost) - 1) * 100 if cost > 0 else 0
-    return pachka_final, dona_final, real_markup
+    return int(pachka_final), int(dona_final), real_markup
 
-# 4. ДИЗАЙН (CSS)
-st.markdown("""
-    <style>
-    .stApp { background-color: #f0f2f6; }
-    .main-title { color: #004a99; text-align: center; font-weight: bold; text-shadow: 1px 1px 2px white; }
-    .stButton>button { background-color: #004a99 !important; color: white !important; font-weight: bold; border-radius: 10px; height: 50px; }
-    .success-box { background-color: #d4edda; padding: 15px; border-radius: 10px; border: 1px solid #c3e6cb; color: #155724; }
-    </style>
-    """, unsafe_allow_html=True)
+# 2. ИНТЕРФЕЙС
+st.set_page_config(page_title="MEDEXTRA PRO", layout="centered")
 
-# 5. КИРИШ ТИЗИМИ
-if "auth" not in st.session_state: st.session_state["auth"] = False
+st.markdown("<h2 style='text-align: center; color: #004a99;'>💊 MEDEXTRA: ТОЗА НАРХЛАШ</h2>", unsafe_allow_html=True)
 
-if not st.session_state["auth"]:
-    st.markdown("<h1 class='main-title'>💊 MEDEXTRA PRO TIZIMI</h1>", unsafe_allow_html=True)
-    with st.container():
-        u = st.text_input("Логин/Телефон")
-        p = st.text_input("Парол", type="password")
-        if st.button("ТИЗИМГА КИРИШ"):
-            if u == "admin" and p == "Abbos96": # Ўзингизга мосланг
-                st.session_state["auth"] = True
-                st.session_state["
+uploaded_files = st.file_uploader("Файлларни танланг", type=['xlsx', 'pdf'], accept_multiple_files=True)
+
+if uploaded_files:
+    try:
+        # Устунларни аниқлаш
+        df_sample = pd.read_excel(uploaded_files[0])
+        cols = df_sample.columns.tolist()
+    except:
+        cols = ["Nomi", "Narxi"]
+    
+    c1, c2 = st.columns(2)
+    col_n = c1.selectbox("💊 Дори номи", cols, index=0)
+    col_c = c2.selectbox("💰 Таннарх", cols, index=min(3, len(cols)-1))
+
+    if st.button("🚀 ҲИСОБЛАШ"):
+        all_data = []
+        for f in uploaded_files:
+            df = pd.read_excel(f).fillna(0)
+            p_res, d_res, m_res = [], [], []
+            
+            for _, row in df.iterrows():
+                try:
+                    raw_val = str(row[col_c]).replace(' ', '').replace(',', '.')
+                    cost = float(re.sub(r'[^\d.]', '', raw_val))
+                    size = get_pack_size(row[col_n])
+                    
+                    p_p, d_p, m_p = calculate_prices(cost, size)
+                    
+                    p_res.append(p_p)
+                    d_res.append(d_p)
+                    m_res.append(f"{m_p:.1f}%")
+                except:
+                    p_res.append(0); d_res.append(0); m_res.append("0%")
+            
+            df['SOTUV_PACHKA'] = p_res
+            df['SOTUV_DONA'] = d_res
+            df['FOYDA_FOIZ'] = m_res
+            
+            # Excel қилиш
+            out = io.BytesIO()
+            with pd.ExcelWriter(out, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False)
+            all_data.append((f.name, out.getvalue()))
+
+        if all_data:
+            if len(all_data) > 1:
+                zip_b = io.BytesIO()
+                with zipfile.ZipFile(zip_b, "w") as zf:
+                    for name, data in all_data:
+                        zf.writestr(f"Tayyor_{name}", data)
+                st.download_button("📥 ZIP ЮКЛАШ", zip_b.getvalue(), "Natijalar.zip")
+            else:
+                st.download_button("📥 Excelни юклаш", all_data[0][1], f"Tayyor_{all_data[0][0]}")
