@@ -50,14 +50,25 @@ def get_pack_size(name):
     return int(match.group(1)) if match else 1
 
 def calculate_prices(cost, pack_size):
-    """Pachka va dona narxini hisoblash va yaxlitlash"""
-    # Pachka narxi: 12% qo'shish va 100 ga tepaga yaxlitlash
-    pachka_final = math.ceil((cost * 1.12) / 100) * 100
-    # Dona narxi: Pachka narxi / dona soni va 100 ga tepaga yaxlitlash
-    dona_price = math.ceil((pachka_final / (pack_size if pack_size > 0 else 1)) / 100) * 100
-    # Haqiqiy ustama foizi
+    # 1. Tannarxga 12% ustama qo'shish
+    raw_price = cost * 1.12
+    
+    # 2. Pachka narxini 1000 so'mga TEPAGA yaxlitlash
+    pachka_final = math.ceil(raw_price / 1000) * 1000
+    
+    # 3. Dona narxini hisoblash
+    if pack_size > 1:
+        # Pachka narxini dona soniga bo'lib, 100 so'mga TEPAGA yaxlitlash
+        dona_raw = pachka_final / pack_size
+        dona_final = math.ceil(dona_raw / 100) * 100
+    else:
+        # №1 bo'lsa, dona narxi pachka narxi bilan bir xil
+        dona_final = pachka_final
+        
+    # 4. Haqiqiy ustama foizini qaytarish
     real_markup = ((pachka_final / cost) - 1) * 100 if cost > 0 else 0
-    return pachka_final, dona_price, real_markup
+    
+    return pachka_final, dona_final, real_markup
 
 # 5. LOGIN TIZIMI
 if "auth" not in st.session_state: st.session_state["auth"] = False
