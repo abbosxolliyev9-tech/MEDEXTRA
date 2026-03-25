@@ -7,15 +7,17 @@ import pdfplumber
 import sqlite3
 import hashlib
 import uuid
+import zipfile
 
-# 1. DATABASE SOZLAMALARI
+# 1. SAHIFA SOZLAMALARI
+st.set_page_config(page_title="MEDEXTRA", page_icon="💊", layout="centered")
+
+# 2. DATABASE FUNKSIYALARI
 def init_db():
     conn = sqlite3.connect('medextra_users.db')
     c = conn.cursor()
-    # status: 0-kutish, 1-aktiv, 9-admin
     c.execute('''CREATE TABLE IF NOT EXISTS users 
                  (phone TEXT PRIMARY KEY, password TEXT, name TEXT, session_id TEXT, status INTEGER)''')
-    # Adminni yaratib qo'yamiz (agar bo'lmasa)
     admin_pass = hashlib.sha256("Abbos96".encode()).hexdigest()
     c.execute('INSERT OR IGNORE INTO users VALUES (?,?,?,?,?)', 
               ('admin', admin_pass, 'ADMIN', '', 9))
@@ -24,7 +26,7 @@ def init_db():
 
 init_db()
 
-# 2. DIZAYN (TINIQLASHTIRILGAN)
+# 3. DIZAYN (CSS)
 def add_custom_style():
     bg_image = "https://raw.githubusercontent.com/abbosxolliyev9-tech/MEDEXTRA/main/pexels-eren-34577902.jpg"
     st.markdown(f"""
@@ -33,36 +35,31 @@ def add_custom_style():
         .stTabs [data-baseweb="tab-list"] {{ background-color: #004a99; border-radius: 10px; padding: 5px; }}
         .stTabs [data-baseweb="tab"] {{ color: white !important; font-weight: bold; }}
         .blue-label {{ background-color: #004a99; color: white !important; padding: 8px 15px; border-radius: 5px; font-weight: bold; text-align: center; margin-bottom: 10px; }}
-        label {{ background-color: #004a99 !important; color: white !important; padding: 2px 10px !important; border-radius: 4px !important; }}
+        label {{ background-color: #004a99 !important; color: white !important; padding: 2px 10px !important; border-radius: 4px !important; font-weight: bold !important; }}
         .stButton>button {{ background-color: #004a99 !important; color: white !important; font-weight: bold !important; border-radius: 8px !important; }}
+        .footer-box {{ background-color: #004a99; color: white !important; padding: 10px; border-radius: 5px; text-align: center; margin-top: 20px; }}
         </style>
         """, unsafe_allow_html=True)
 
 add_custom_style()
 
-# 3. MANTIQIY FUNKSIYALAR
+# 4. MATEMATIK VA HISOB-KITOB MANTIQI
 def get_pack_size(name):
+    """Dori nomidan № sonini qidirish"""
     match = re.search(r'[N№](\d+)', str(name).upper())
-    if match: return int(match.group(1))
-    match_alt = re.search(r'(\d+)\s*(ТА|TA|ШТ|шт)', str(name).upper())
-    if match_alt: return int(match_alt.group(1))
-    return 1
+    return int(match.group(1)) if match else 1
 
 def calculate_prices(cost, pack_size):
-    if cost <= 0: return 0, 0, 0
-    unit_cost = cost / pack_size
-    raw_price = unit_cost * 1.12
-    if pack_size == 1:
-        final_price = math.ceil(raw_price / 1000) * 1000
-        if final_price > (unit_cost * 1.18):
-            final_price = math.ceil(raw_price / 100) * 100
-    else:
-        final_price = math.ceil(raw_price / 100) * 100
-    pachka_final = final_price * pack_size
-    real_markup = ((pachka_final / cost) - 1) * 100
-    return pachka_final, final_price, real_markup
+    """Pachka va dona narxini hisoblash va yaxlitlash"""
+    # Pachka narxi: 12% qo'shish va 100 ga tepaga yaxlitlash
+    pachka_final = math.ceil((cost * 1.12) / 100) * 100
+    # Dona narxi: Pachka narxi / dona soni va 100 ga tepaga yaxlitlash
+    dona_price = math.ceil((pachka_final / (pack_size if pack_size > 0 else 1)) / 100) * 100
+    # Haqiqiy ustama foizi
+    real_markup = ((pachka_final / cost) - 1) * 100 if cost > 0 else 0
+    return pachka_final, dona_price, real_markup
 
-# 4. LOGIN / REGISTRATSIYA
+# 5. LOGIN TIZIMI
 if "auth" not in st.session_state: st.session_state["auth"] = False
 
 if not st.session_state["auth"]:
@@ -70,9 +67,9 @@ if not st.session_state["auth"]:
     
     with tab_reg:
         st.markdown('<div class="blue-label">Янги фойдаланувчи</div>', unsafe_allow_html=True)
-        reg_name = st.text_input("Исмингиз")
-        reg_phone = st.text_input("Телефон (масалан: 991234567)")
-        reg_pass = st.text_input("Парол ўйлаб топинг", type="password")
+        reg_name = st.text_input("Исмингиз", key="reg_name")
+        reg_phone = st.text_input("Телефон (масалан: 991234567)", key="reg_phone")
+        reg_pass = st.text_input("Парол ўйлаб топинг", type="password", key="reg_pass")
         if st.button("РЎЙХАТДАН ЎТИШ"):
             if reg_phone and reg_pass:
                 conn = sqlite3.connect('medextra_users.db')
@@ -81,14 +78,14 @@ if not st.session_state["auth"]:
                     hashed = hashlib.sha256(reg_pass.encode()).hexdigest()
                     c.execute('INSERT INTO users VALUES (?,?,?,?,?)', (reg_phone, hashed, reg_name, '', 0))
                     conn.commit()
-                    st.success("Рўйхатдан ўтдингиз! Тўловни қилинг ва админ тасдиқлашини кутинг.")
-                except: st.error("Бу рақам банд!")
+                    st.success("✅ Рўйхатdan o'tdingiz! Admin tasdiqlashini kuting.")
+                except: st.error("❌ Bu raqam band!")
                 conn.close()
 
     with tab_log:
         st.markdown('<div class="blue-label">Тизимга кириш</div>', unsafe_allow_html=True)
-        login_u = st.text_input("Телефон")
-        login_p = st.text_input("Парол", type="password")
+        login_u = st.text_input("Телефон/Логин", key="login_u")
+        login_p = st.text_input("Парол", type="password", key="login_p")
         if st.button("КИРИШ", use_container_width=True):
             conn = sqlite3.connect('medextra_users.db')
             c = conn.cursor()
@@ -97,26 +94,35 @@ if not st.session_state["auth"]:
             user = c.fetchone()
             if user:
                 if user[4] == 0:
-                    st.warning("Ҳисобингиз ҳали фаоллаштирилмаган. Админга боғланинг.")
+                    st.warning("⏳ Hisobingiz hali faollashtirilmagan.")
                 else:
                     new_sid = str(uuid.uuid4())
                     c.execute('UPDATE users SET session_id=? WHERE phone=?', (new_sid, login_u))
                     conn.commit()
-                    st.session_state["auth"] = True
-                    st.session_state["user"] = login_u
-                    st.session_state["sid"] = new_sid
-                    st.session_state["role"] = user[4]
+                    st.session_state.update({"auth": True, "user": login_u, "sid": new_sid, "role": user[4]})
                     st.rerun()
-            else: st.error("Маълумотлар хато!")
+            else: st.error("❌ Login yoki parol xato!")
             conn.close()
+    st.markdown('<div class="footer-box">Боғланиш: <br><b>📞 +998 88 754 98 96</b></div>', unsafe_allow_html=True)
     st.stop()
 
-# 5. ADMIN PANEL (Faqat siz uchun)
+# 6. SEANS VA ADMIN NAZORATI
+conn = sqlite3.connect('medextra_users.db')
+c = conn.cursor()
+c.execute('SELECT session_id, status FROM users WHERE phone=?', (st.session_state["user"],))
+db_res = c.fetchone()
+conn.close()
+
+if db_res and db_res[0] != st.session_state["sid"]:
+    st.error("❗ Boshqa qurilmadan kirildi! Tizimdan chiqarildingiz.")
+    st.session_state["auth"] = False
+    st.stop()
+
 if st.session_state.get("role") == 9:
     with st.expander("🛠 АДМИН ПАНЕЛИ"):
         conn = sqlite3.connect('medextra_users.db')
         c = conn.cursor()
-        c.execute('SELECT phone, name, status FROM users WHERE status=0')
+        c.execute('SELECT phone, name FROM users WHERE status=0')
         pending = c.fetchall()
         if pending:
             for p_user in pending:
@@ -126,55 +132,88 @@ if st.session_state.get("role") == 9:
                     c.execute('UPDATE users SET status=1 WHERE phone=?', (p_user[0],))
                     conn.commit()
                     st.rerun()
-        else: st.write("Янги сўровлар йўқ.")
+        else: st.write("Yangi so'rovlar yo'q.")
         conn.close()
 
-# 6. SEANSNI TEKSHIRISH (Bitta qurilma cheklovi)
-conn = sqlite3.connect('medextra_users.db')
-c = conn.cursor()
-c.execute('SELECT session_id FROM users WHERE phone=?', (st.session_state["user"],))
-db_sid = c.fetchone()[0]
-conn.close()
-if db_sid != st.session_state["sid"]:
-    st.error("Бошқа қурилмадан кирилди! Тизимдан чиқарилдингиз.")
-    st.session_state["auth"] = False
-    st.stop()
+# 7. ASOSIY ISHCHI QISM (KO'P FAYLLI VA ZIP TIZIMI)
+st.markdown("<h1 style='color: white; text-shadow: 2px 2px 8px black; text-align: center;'>📋 Файлларни тўплам бўлиб ҳисоблаш</h1>", unsafe_allow_html=True)
 
-# 7. ASOSIY ISHCHI QISM (Excel va PDF)
-st.markdown("<h1 style='text-align: center;'>📋 Файлларни ҳисоблаш</h1>", unsafe_allow_html=True)
-t1, t2 = st.tabs(["📊 Excel", "📄 PDF"])
+uploaded_files = st.file_uploader("Excel yoki PDF fayllarni tanlang (bir nechta bo'lishi mumkin)", 
+                                  type=['xlsx', 'pdf'], 
+                                  accept_multiple_files=True)
 
-def run_logic(df, n):
-    df = df.fillna(0)
-    cols = df.columns.tolist()
+if uploaded_files:
+    st.info(f"Yulangan fayllar soni: {len(uploaded_files)} ta")
+    
+    # Ustunlarni aniqlash uchun birinchi faylni o'qish
+    try:
+        if uploaded_files[0].name.endswith('xlsx'):
+            temp_df = pd.read_excel(uploaded_files[0])
+        else:
+            with pdfplumber.open(uploaded_files[0]) as p:
+                tbl = p.pages[0].extract_table()
+                temp_df = pd.DataFrame(tbl[1:], columns=tbl[0]) if tbl else pd.DataFrame()
+        cols = temp_df.columns.tolist()
+    except:
+        cols = ["Ustun topilmadi"]
+
+    st.markdown('<div class="blue-label">Устунларни созлаш</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    cn = c1.selectbox("Номи", cols, key=f"n{n}")
-    cc = c2.selectbox("Таннарх", cols, index=min(3, len(cols)-1), key=f"c{n}")
-    if st.button("🚀 Ҳисоблаш", key=f"b{n}", use_container_width=True):
-        p_l, d_l, m_l = [], [], []
-        for _, row in df.iterrows():
-            try:
-                v = str(row[cc]).replace(' ', '').replace(',', '.')
-                cost = float(re.sub(r'[^\d.]', '', v))
-                size = get_pack_size(row[cn])
-                pp, dd, mm = calculate_prices(cost, size)
-                p_l.append(pp); d_l.append(dd); m_l.append(f"{mm:.2f}%")
-            except: p_l.append(0); d_l.append(0); m_l.append("0%")
-        df['Pachka Sotuv'], df['Dona Narxi'], df['Наценка'] = p_l, d_l, m_l
-        st.dataframe(df[['Pachka Sotuv', 'Dona Narxi', 'Наценка']].head(10))
-        out = io.BytesIO()
-        with pd.ExcelWriter(out, engine='xlsxwriter') as wr: df.to_excel(wr, index=False)
-        st.download_button("📥 Юклаш", out.getvalue(), f"Tayyor_{n}.xlsx", use_container_width=True)
+    col_n = c1.selectbox("Dori nomi ustuni:", cols, index=0)
+    col_c = c2.selectbox("Tannarx ustuni:", cols, index=min(3, len(cols)-1))
 
-with t1:
-    ex = st.file_uploader("Excel tanlang", type=['xlsx'])
-    if ex: run_logic(pd.read_excel(ex), ex.name)
-with t2:
-    pdff = st.file_uploader("PDF tanlang", type=['pdf'])
-    if pdff:
-        with pdfplumber.open(pdff) as p:
-            all_t = []
-            for pg in p.pages:
-                tbl = pg.extract_table()
-                if tbl: all_t.extend(tbl)
-            if all_t: run_logic(pd.DataFrame(all_t[1:], columns=all_t[0]), pdff.name)
+    if st.button("🚀 BARCHA FAYLLARNI BIRDAНИГА HISOBLASH", use_container_width=True):
+        processed_files = [] 
+        
+        for uploaded_file in uploaded_files:
+            try:
+                if uploaded_file.name.endswith('xlsx'):
+                    df = pd.read_excel(uploaded_file)
+                else:
+                    with pdfplumber.open(uploaded_file) as p:
+                        all_t = []
+                        for pg in p.pages:
+                            tbl = pg.extract_table()
+                            if tbl: all_t.extend(tbl)
+                        df = pd.DataFrame(all_t[1:], columns=all_t[0]) if all_t else pd.DataFrame()
+
+                if not df.empty:
+                    df = df.fillna(0)
+                    p_l, d_l, m_l = [], [], []
+                    
+                    for _, row in df.iterrows():
+                        try:
+                            v = str(row[col_c]).replace(' ', '').replace(',', '.')
+                            cost = float(re.sub(r'[^\d.]', '', v))
+                            size = get_pack_size(row[col_n])
+                            pp, dd, mm = calculate_prices(cost, size)
+                            p_l.append(pp); d_l.append(dd); m_l.append(f"{mm:.2f}%")
+                        except:
+                            p_l.append(0); d_l.append(0); m_l.append("0%")
+                    
+                    df['Pachka Sotuv'] = p_l
+                    df['Dona Narxi'] = d_l
+                    df['Ustama %'] = m_l
+                    
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as wr:
+                        df.to_excel(wr, index=False)
+                    processed_files.append((uploaded_file.name, output.getvalue()))
+            except Exception as e:
+                st.error(f"❌ {uploaded_file.name} hisoblashda xato: {e}")
+
+        if processed_files:
+            if len(processed_files) == 1:
+                st.download_button(f"📥 {processed_files[0][0]} yuklash", 
+                                   processed_files[0][1], 
+                                   f"Tayyor_{processed_files[0][0]}", use_container_width=True)
+            else:
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zf:
+                    for name, data in processed_files:
+                        zf.writestr(f"Tayyor_{name}.xlsx", data)
+                
+                st.success("✅ Barcha fayllar tayyor!")
+                st.download_button("📥 BARCHA TAYYOR FAYLLARNI YUKLASH (ZIP)", 
+                                   zip_buffer.getvalue(), 
+                                   "Medextra_Fayllar.zip", use_container_width=True)
