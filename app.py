@@ -26,7 +26,7 @@ def init_db():
 
 init_db()
 
-# 3. DIZAYN (Sizga yoqqan ko'k uslub)
+# 3. DIZAYN
 def add_custom_style():
     bg_image = "https://raw.githubusercontent.com/abbosxolliyev9-tech/MEDEXTRA/main/pexels-eren-34577902.jpg"
     st.markdown(f"""
@@ -87,7 +87,7 @@ def calculate_prices(cost, pack_size):
     pachka_final = int(res_unit * pack_size)
     return pachka_final, int(res_unit), ((pachka_final / cost) - 1) * 100 if cost > 0 else 0
 
-# 5. LOGIN TIZIMI (KEY lar bilan to'g'rilandi)
+# 5. LOGIN TIZIMI
 if "auth" not in st.session_state: st.session_state["auth"] = False
 
 if not st.session_state["auth"]:
@@ -95,7 +95,8 @@ if not st.session_state["auth"]:
     
     with tab_log:
         st.markdown('<div class="blue-label">Тизимга кириш</div>', unsafe_allow_html=True)
-        login_u = st.text_input("Логин / Телефон", key="login_user")
+        # BU YERDA RAQAMINGIZ QO'SHILDI:
+        login_u = st.text_input("Логин / Телефон", value="+998887549896", key="login_user")
         login_p = st.text_input("Парол", type="password", key="login_pass")
         if st.button("КИРИШ", key="login_btn"):
             conn = sqlite3.connect('medextra_users.db')
@@ -142,13 +143,12 @@ if st.session_state.get("role") == 9:
                 st.rerun()
         conn.close()
 
-# 7. ASOSIY ISHCHI QISM (ZIP bilan)
+# 7. ASOSIY ISHCHI QISM
 st.markdown('<div class="blue-label">📋 ФАЙЛЛАРНИ ҲИСОБЛАШ</div>', unsafe_allow_html=True)
 uploaded_files = st.file_uploader("Excel ёки PDF танланг", type=['xlsx', 'pdf'], accept_multiple_files=True)
 
 if uploaded_files:
     try:
-        # Ustunlarni aniqlash
         if uploaded_files[0].name.endswith('xlsx'):
             df_temp = pd.read_excel(uploaded_files[0])
         else:
