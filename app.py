@@ -27,7 +27,7 @@ def add_custom_style():
             border-radius: 10px;
             text-align: center;
             font-weight: bold;
-            font-size: 22px;
+            font-size: 20px;
             margin-bottom: 20px;
             border: 1px solid white;
         }}
@@ -38,7 +38,7 @@ def add_custom_style():
             border-radius: 10px;
             text-align: center;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 16px;
             margin-top: 25px;
             border: 2px solid white;
         }}
@@ -51,9 +51,8 @@ def add_custom_style():
             height: 45px;
             border: 1px solid white;
         }}
-        /* Sidebar dizayni */
         [data-testid="stSidebar"] {{
-            background-color: rgba(0, 74, 153, 0.9);
+            background-color: rgba(0, 74, 153, 0.95);
         }}
         [data-testid="stSidebar"] * {{
             color: white !important;
@@ -72,7 +71,7 @@ def load_users_data():
     except:
         return pd.DataFrame(columns=['phone', 'password', 'name', 'status'])
 
-# 4. MATEMATIK MANTIQ (FUNKSIYALAR)
+# 4. МАТЕМАТИК ФУНКЦИЯЛАР
 def get_pack_size(name):
     name_upper = str(name).upper()
     if any(word in name_upper for word in ["САЛФЕТКА", "ЧОЙ", "CHAY", "SALFETKA", "МАРЛЯ", "БИНТ"]):
@@ -80,7 +79,6 @@ def get_pack_size(name):
     match = re.search(r'[N№](\d+)', name_upper)
     return int(match.group(1)) if match else 1
 
-# SIZNING ADMIN MANTIQINGIZ (14%, 12%, 10%)
 def admin_calculate(cost, pack_size):
     unit_cost = cost / pack_size
     safe_limit = unit_cost * 1.19
@@ -91,7 +89,6 @@ def admin_calculate(cost, pack_size):
     pachka_final = int(res_unit * pack_size)
     return pachka_final, int(res_unit)
 
-# FOYDALANUVCHILAR UCHUN ERKIN FOIZLI MANTIQ
 def user_calculate(cost, pack_size, pct):
     pachka_raw = cost * (1 + pct / 100)
     pachka_final = math.ceil(pachka_raw / 100) * 100
@@ -103,7 +100,7 @@ def user_calculate(cost, pack_size, pct):
 if "auth" not in st.session_state: st.session_state["auth"] = False
 
 if not st.session_state["auth"]:
-    tab_log, _ = st.tabs(["🔑 КИРИШ", "📝 РЎЙХАТДАН ЎТИШ"])
+    tab_log, tab_reg = st.tabs(["🔑 КИРИШ", "📝 РЎЙХАТДАН ЎТИШ"])
     with tab_log:
         st.markdown('<div class="blue-label">Тизимга кириш</div>', unsafe_allow_html=True)
         login_u = st.text_input("Логин / Телефон")
@@ -115,43 +112,92 @@ if not st.session_state["auth"]:
             if not user_row.empty:
                 db_pass = str(user_row.iloc[0]['password'])
                 if db_pass == entered_hash or db_pass == login_p:
-                    st.session_state["auth"] = True
-                    st.rerun()
+                    if int(user_row.iloc[0]['status']) == 0:
+                        st.warning("Админ тасдиқлашини кутинг!")
+                    else:
+                        st.session_state["auth"] = True
+                        st.session_state["user"] = login_u
+                        st.session_state["role"] = int(user_row.iloc[0]['status'])
+                        st.rerun()
                 else: st.error("Парол хато!")
             else: st.error("Фойдаланувчи топилмади!")
-        st.markdown('<div class="contact-box">📞 Боғланиш учун: +998 88 754 98 96</div>', unsafe_allow_html=True)
+    
+    with tab_reg:
+        st.info("Рўйхатдан ўтиш учун админ билан боғланинг: +998 88 754 98 96")
+    
+    st.markdown('<div class="contact-box">📞 Боғланиш учун: +998 88 754 98 96</div>', unsafe_allow_html=True)
     st.stop()
 
-# 6. MENU VA BO'LIMLAR
-st.sidebar.title("💎 MEDEXTRA")
-menu = st.sidebar.radio("Бўлимни танланг:", ["🚀 Админ Ҳисоб-китоб", "📊 Фоизли Калькулятор"])
+# 6. MENU (SIDEBAR)
+st.sidebar.title(f"👤 {st.session_state.get('user')}")
+menu_options = ["🚀 Админ Ҳисоб-китоб", "📊 Фоизли Калькулятор"]
+if st.session_state.get("role") == 9:
+    menu_options.append("⚙️ Админ Панел")
 
+menu = st.sidebar.radio("Бўлимни танланг:", menu_options)
+
+# 7. BO'LIMLAR
 if menu == "🚀 Админ Ҳисоб-китоб":
-    st.markdown('<div class="blue-label">📋 АДМИН ҲИСОБ-КИТОБИ (14%-12%-10%)</div>', unsafe_allow_html=True)
-    files = st.file_uploader("Файлларни танланг", accept_multiple_files=True, key="admin_up")
-    
-    if files and st.button("ҲИСОБЛАШ (ADMIN)"):
+    st.markdown('<div class="blue-label">📋 АДМИН ҲИСОБЛАШ (14%-12%-10%)</div>', unsafe_allow_html=True)
+    files = st.file_uploader("Excel/PDF танланг", accept_multiple_files=True)
+    if files and st.button("🚀 ҲИСОБЛАШ"):
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w") as zf:
             for f in files:
-                # Excel/PDF o'qish va admin_calculate orqali hisoblash kodi...
-                # (Yuqoridagi admin mantiqi ishlatiladi)
-                df = pd.read_excel(f) if f.name.endswith('xlsx') else pd.DataFrame()
-                # ... (davomi yuqoridagi admin mantiqi bilan bir xil)
-                st.info(f"{f.name} ҳисобланмоқда...")
-        st.success("Админ режимида ҳисобланди!")
+                if f.name.endswith('xlsx'): df = pd.read_excel(f)
+                else:
+                    with pdfplumber.open(f) as p:
+                        rows = []
+                        for pg in p.pages:
+                            if pg.extract_table(): rows.extend(pg.extract_table())
+                        df = pd.DataFrame(rows[1:], columns=rows[0])
+                
+                p_l, d_l = [], []
+                for _, row in df.iterrows():
+                    try:
+                        cost = float(re.sub(r'[^\d.]', '', str(row.iloc[3]).replace(',','.')))
+                        p_f, d_f = admin_calculate(cost, get_pack_size(row.iloc[0]))
+                        p_l.append(p_f); d_l.append(d_f)
+                    except: p_l.append(0); d_l.append(0)
+                df['Sotuv_Pachka'], df['Sotuv_Dona'] = p_l, d_l
+                out = io.BytesIO()
+                with pd.ExcelWriter(out, engine='xlsxwriter') as wr: df.to_excel(wr, index=False)
+                zf.writestr(f"Admin_{f.name.replace('.pdf','.xlsx')}", out.getvalue())
+        st.download_button("📥 ZIP ЮКЛАШ", zip_buf.getvalue(), "Admin_Natijalar.zip")
 
 elif menu == "📊 Фоизли Калькулятор":
-    st.markdown('<div class="blue-label">📊 ФОИЗНИ ЎЗИНГИЗ ТАНЛАНГ</div>', unsafe_allow_html=True)
-    
-    # Foiz tanlash
+    st.markdown('<div class="blue-label">📊 ИХТИЁРИЙ ФОИЗЛИ ҲИСОБЛАШ</div>', unsafe_allow_html=True)
     user_pct = st.slider("Қўшиладиган фоизни танланг:", 1, 20, 10)
-    st.write(f"Танланган устама: **{user_pct}%** (Натижа 100 сўмга яхлитланади)")
-    
-    u_files = st.file_uploader("Файлларни танланг", accept_multiple_files=True, key="user_up")
-    
-    if u_files and st.button("ФОИЗ БЎЙИЧА ҲИСОБЛАШ"):
-        # Bu yerda user_calculate funksiyasi ishlatiladi
-        st.success(f"Барча дориларга {user_pct}% устама қўшилди!")
+    u_files = st.file_uploader("Excel/PDF танланг", accept_multiple_files=True, key="u_up")
+    if u_files and st.button("📊 ҲИСОБЛАШ"):
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w") as zf:
+            for f in u_files:
+                if f.name.endswith('xlsx'): df = pd.read_excel(f)
+                else:
+                    with pdfplumber.open(f) as p:
+                        rows = []
+                        for pg in p.pages:
+                            if pg.extract_table(): rows.extend(pg.extract_table())
+                        df = pd.DataFrame(rows[1:], columns=rows[0])
+                
+                p_l, d_l = [], []
+                for _, row in df.iterrows():
+                    try:
+                        cost = float(re.sub(r'[^\d.]', '', str(row.iloc[3]).replace(',','.')))
+                        p_f, d_f = user_calculate(cost, get_pack_size(row.iloc[0]), user_pct)
+                        p_l.append(p_f); d_l.append(d_f)
+                    except: p_l.append(0); d_l.append(0)
+                df['Sotuv_Pachka'], df['Sotuv_Dona'] = p_l, d_l
+                out = io.BytesIO()
+                with pd.ExcelWriter(out, engine='xlsxwriter') as wr: df.to_excel(wr, index=False)
+                zf.writestr(f"User_{user_pct}pct_{f.name.replace('.pdf','.xlsx')}", out.getvalue())
+        st.download_button("📥 ZIP ЮКЛАШ", zip_buf.getvalue(), "User_Natijalar.zip")
+
+elif menu == "⚙️ Админ Панел":
+    st.markdown('<div class="blue-label">⚙️ ФОЙДАЛАНУВЧИЛАРНИ БОШҚАРИШ</div>', unsafe_allow_html=True)
+    st.write("Google Sheets орқали янги фойдаланувчиларни тасдиқлашингиз мумкин.")
+    st.info("Янги рўйхатдан ўтганларнинг 'status' устунини 0 дан 1 га ўзгартириб қўйинг.")
+    st.link_button("🌐 Google Sheets-ни очиш", "https://docs.google.com/spreadsheets/d/1XyO5EqqDonEfQnmqr8j7SQNbVcx2SC93txhFVHoDGQA/edit")
 
 st.markdown('<div class="contact-box">📞 Боғланиш учун: +998 88 754 98 96</div>', unsafe_allow_html=True)
