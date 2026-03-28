@@ -4,27 +4,21 @@ import io
 import re
 import math
 import pdfplumber
-import sqlite3
 import hashlib
-import uuid
 import zipfile
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # 1. SAHIFA SOZLAMALARI
 st.set_page_config(page_title="MEDEXTRA", page_icon="💊", layout="centered")
 
-# 2. DATABASE (Faqat bir marta yaratiladi)
-def init_db():
-    conn = sqlite3.connect('medextra_users.db', check_same_thread=False)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (phone TEXT PRIMARY KEY, password TEXT, name TEXT, session_id TEXT, status INTEGER)''')
-    admin_pass = hashlib.sha256("Abbos96".encode()).hexdigest()
-    c.execute('INSERT OR IGNORE INTO users VALUES (?,?,?,?,?)', 
-              ('admin', admin_pass, 'ADMIN', '', 9))
-    conn.commit()
-    conn.close()
+# 2. GOOGLE SHEETS ULANISHI
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1XyO5EqqDonEfQnmqr8j7SQNbVcx2SC93txhFVHoDGQA/edit?usp=sharing"
 
-init_db()
+def get_google_sheet():
+    # Diqqat: Bu yerda ochiq havola orqali o'qish uchun pandas ishlatamiz
+    csv_url = SHEET_URL.replace('/edit?usp=sharing', '/export?format=csv')
+    return pd.read_csv(csv_url)
 
 # 3. DIZAYN
 def add_custom_style():
@@ -58,6 +52,7 @@ def add_custom_style():
             padding: 10px;
             font-weight: bold;
             border-top: 1px solid white;
+            z-index: 999;
         }}
         .stButton>button {{
             background-color: #004a99 !important;
@@ -67,14 +62,6 @@ def add_custom_style():
             border-radius: 8px;
             height: 45px;
             border: 1px solid white;
-        }}
-        .stTabs [data-baseweb="tab-list"] {{
-            background-color: #004a99;
-            border-radius: 8px;
-            padding: 5px;
-        }}
-        .stTabs [data-baseweb="tab"] {{
-            color: white !important;
         }}
         </style>
         """, unsafe_allow_html=True)
@@ -107,57 +94,39 @@ if not st.session_state["auth"]:
     
     with tab_log:
         st.markdown('<div class="blue-label">Тизимга кириш</div>', unsafe_allow_html=True)
-        login_u = st.text_input("Логин / Телефон", key="login_user")
+        login_u = st.text_input("Логин / Телефон", value="+998887549896", key="login_user")
         login_p = st.text_input("Парол", type="password", key="login_pass")
+        
         if st.button("КИРИШ", key="login_btn"):
-            conn = sqlite3.connect('medextra_users.db')
-            c = conn.cursor()
-            hashed = hashlib.sha256(login_p.encode()).hexdigest()
-            c.execute('SELECT * FROM users WHERE phone=? AND password=?', (login_u, hashed))
-            user = c.fetchone()
-            if user:
-                if user[4] == 0: st.warning("Админ тасдиқлашини кутинг.")
+            try:
+                users_df = get_google_sheet()
+                hashed = hashlib.sha256(login_p.encode()).hexdigest()
+                # Foydalanuvchini tekshirish
+                user_row = users_df[(users_df['phone'].astype(str) == str(login_u)) & (users_df['password'] == hashed)]
+                
+                if not user_row.empty:
+                    status = user_row.iloc[0]['status']
+                    if status == 0:
+                        st.warning("Админ тасдиқлашиni кутинг.")
+                    else:
+                        st.session_state["auth"] = True
+                        st.session_state["user"] = login_u
+                        st.session_state["role"] = status
+                        st.rerun()
                 else:
-                    st.session_state["auth"], st.session_state["user"], st.session_state["role"] = True, login_u, user[4]
-                    st.rerun()
-            else: st.error("Хато!")
-            conn.close()
+                    st.error("Raqam yoki parol xato!")
+            except Exception as e:
+                st.error(f"Ulanishda xato: {e}")
 
     with tab_reg:
         st.markdown('<div class="blue-label">Рўйхатдан ўтиш</div>', unsafe_allow_html=True)
-        reg_name = st.text_input("Исмингиз", key="reg_name")
-        reg_phone = st.text_input("Телефон", key="reg_phone")
-        reg_pass = st.text_input("Парол ўйлаб топинг", type="password", key="reg_pass")
-        if st.button("РЎЙХАТДАН ЎТИШ", key="reg_btn"):
-            if reg_phone and reg_pass:
-                conn = sqlite3.connect('medextra_users.db')
-                c = conn.cursor()
-                try:
-                    hashed = hashlib.sha256(reg_pass.encode()).hexdigest()
-                    c.execute('INSERT INTO users VALUES (?,?,?,?,?)', (reg_phone, hashed, reg_name, '', 0))
-                    conn.commit()
-                    st.success("Рўйхатдан ўтдингиз!")
-                except: st.error("Бу рақам банд!")
-                conn.close()
+        st.info("Ro'yxatdan o'tish uchun admin bilan bog'laning: +998887549896")
+        st.write("Hozircha Google jadval orqali avtomatik yozish uchun maxsus API kalit kerak. Xavfsizlik uchun foydalanuvchilarni o'zingiz jadvalga qo'shib qo'yishingizni maslahat beraman.")
     
-    # LOGIN OYNASIDA HAM FOOTER KO'RINSIN
-    st.markdown('<div class="footer">Боғланиш учун: +998887549896</div>', unsafe_allow_html=True)
+    st.markdown('<div class="footer">Боғланиш uchun: +998887549896</div>', unsafe_allow_html=True)
     st.stop()
 
-# 6. ADMIN PANEL
-if st.session_state.get("role") == 9:
-    with st.expander("🛠 АДМИН ПАНЕЛИ"):
-        conn = sqlite3.connect('medextra_users.db')
-        c = conn.cursor()
-        c.execute('SELECT phone, name FROM users WHERE status=0')
-        for p_u in c.fetchall():
-            if st.button(f"✅ Тасдиқлаш: {p_u[1]} ({p_u[0]})", key=p_u[0]):
-                c.execute('UPDATE users SET status=1 WHERE phone=?', (p_u[0],))
-                conn.commit()
-                st.rerun()
-        conn.close()
-
-# 7. ASOSIY ISHCHI QISM
+# 6. ASOSIY ISHCHI QISM
 st.markdown('<div class="blue-label">📋 ФАЙЛЛАРНИ ҲИСОБЛАШ</div>', unsafe_allow_html=True)
 uploaded_files = st.file_uploader("Excel ёки PDF танланг", type=['xlsx', 'pdf'], accept_multiple_files=True)
 
@@ -172,7 +141,7 @@ if uploaded_files:
         
         c1, c2 = st.columns(2)
         col_n = c1.selectbox("💊 Номи устуни", cols)
-        col_c = c2.selectbox("💰 Таннарх устуни", cols, index=min(3, len(cols)-1))
+        col_c = c2.selectbox("💰 Таннарх устуni", cols, index=min(3, len(cols)-1))
 
         if st.button("🚀 ҲИСОБЛАШ ВА ZIP ҚИЛИШ"):
             zip_buf = io.BytesIO()
@@ -201,7 +170,6 @@ if uploaded_files:
                     zf.writestr(f"Tayyor_{f.name.replace('.pdf','.xlsx')}", out.getvalue())
             
             st.download_button("📥 ZIP ЮКЛАШ", zip_buf.getvalue(), "Natijalar.zip")
-    except Exception as e: st.error(f"Хато: {e}")
+    except Exception as e: st.error(f"Xato: {e}")
 
-# SAYTNING ENG PASTI UCHUN DOIMIY MATN
-st.markdown('<div class="footer">Боғланиш учун: +998887549896</div>', unsafe_allow_html=True)
+st.markdown('<div class="footer">Боғланиш uchun: +998887549896</div>', unsafe_allow_html=True)
