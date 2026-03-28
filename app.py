@@ -47,6 +47,18 @@ def add_custom_style():
             margin-bottom: 20px;
             border: 1px solid white;
         }}
+        .footer {{
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            background-color: rgba(0, 74, 153, 0.8);
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-weight: bold;
+            border-top: 1px solid white;
+        }}
         .stButton>button {{
             background-color: #004a99 !important;
             color: white !important;
@@ -95,8 +107,7 @@ if not st.session_state["auth"]:
     
     with tab_log:
         st.markdown('<div class="blue-label">Тизимга кириш</div>', unsafe_allow_html=True)
-        # BU YERDA RAQAMINGIZ QO'SHILDI:
-        login_u = st.text_input("Логин / Телефон", value="+998887549896", key="login_user")
+        login_u = st.text_input("Логин / Телефон", key="login_user")
         login_p = st.text_input("Парол", type="password", key="login_pass")
         if st.button("КИРИШ", key="login_btn"):
             conn = sqlite3.connect('medextra_users.db')
@@ -128,6 +139,9 @@ if not st.session_state["auth"]:
                     st.success("Рўйхатдан ўтдингиз!")
                 except: st.error("Бу рақам банд!")
                 conn.close()
+    
+    # LOGIN OYNASIDA HAM FOOTER KO'RINSIN
+    st.markdown('<div class="footer">Боғланиш учун: +998887549896</div>', unsafe_allow_html=True)
     st.stop()
 
 # 6. ADMIN PANEL
@@ -188,3 +202,6 @@ if uploaded_files:
             
             st.download_button("📥 ZIP ЮКЛАШ", zip_buf.getvalue(), "Natijalar.zip")
     except Exception as e: st.error(f"Хато: {e}")
+
+# SAYTNING ENG PASTI UCHUN DOIMIY MATN
+st.markdown('<div class="footer">Боғланиш учун: +998887549896</div>', unsafe_allow_html=True)
