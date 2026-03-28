@@ -89,18 +89,25 @@ if not st.session_state["auth"]:
         login_u = st.text_input("Логин / Телефон", value="+998887549896")
         login_p = st.text_input("Парол", type="password")
         
-        if st.button("КИРИШ"):
+       if st.button("КИРИШ"):
             users_df = load_users_data()
-            hashed_p = hashlib.sha256(login_p.encode()).hexdigest()
+            # Фойдаланувчи ёзган паролни шифрлаб кўрамиз
+            entered_pass_hash = hashlib.sha256(login_p.encode()).hexdigest()
             
-            # Tekshirish
-            check = users_df[(users_df['phone'].astype(str) == str(login_u)) & (users_df['password'] == hashed_p)]
+            # Жадвалдан телефонни топамиз
+            user_row = users_df[users_df['phone'].astype(str) == str(login_u)]
             
-            if not check.empty:
-                st.session_state["auth"] = True
-                st.rerun()
+            if not user_row.empty:
+                db_pass = str(user_row.iloc[0]['password']) # Жадвалдаги парол
+                
+                # Икки хил текширамиз: шифрланган ҳолатда ёки оддий матн ҳолида
+                if db_pass == entered_pass_hash or db_pass == login_p:
+                    st.session_state["auth"] = True
+                    st.rerun()
+                else:
+                    st.error("Парол хато!")
             else:
-                st.error("Login yoki parol xato!")
+                st.error("Бундай рақам топилмади!")
         
         # SIZ CHIZGAN JOYDA RAQAMNI CHIQARISH
         st.markdown('<div class="contact-info">📞 Боғланиш учун: +998 88 754 98 96</div>', unsafe_allow_html=True)
