@@ -1,5 +1,7 @@
-streamlit
 pandas
-pdfplumber
 xlsxwriter
 openpyxl
+pdfplumber
+streamlit
+gspread
+oauth2client
