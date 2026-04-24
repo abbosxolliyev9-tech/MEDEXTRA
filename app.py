@@ -40,39 +40,34 @@ def get_pack_size(name):
     return int(match.group(1)) if match else 1
 
 def admin_calculate(cost, pack_size):
-    # 1. Бир дона учун таннархни ҳисоблаймиз
     unit_cost = cost / (pack_size if pack_size > 0 else 1)
     
-    # 2. Фоизни танлаймиз: 200к дан паст бўлса 10%, баланд бўлса 9%
-    pct_rate = 1.10 if cost <= 200000 else 1.09
+    # Фоизни белгилаш
+    if cost > 200000:
+        pct = 1.09  # 9%
+    else:
+        pct = 1.10  # 10%
     
-    # 3. Максимал рухсат этилган чегара (фоиздан ошиб кетмаслиги учун)
-    max_allowed = unit_cost * pct_rate
+    # 1. Фоиз билан ҳисобланган хом нарх
+    raw_price = unit_cost * pct
     
-    # 4. 100 сўмга юқорига яхлитлаб кўрамиз
-    res_unit = math.ceil((unit_cost * pct_rate) / 100) * 100
+    # 2. 100 сўмга юқорига яхлитлаш
+    res_unit = math.ceil(raw_price / 100) * 100
     
-    # 5. Агар яхлитлаш натижасида фоиз чегарасидан ошиб кетсак, пастга яхлитлаймиз
-    if res_unit > max_allowed:
-        res_unit = math.floor(max_allowed / 100) * 100
-    
-    # 6. Агар пастга яхлитлаш таннархдан ҳам пастга тушириб юборса, таннархни юқорига 100 га яхлитлаймиз
+    # 3. Хавфсизлик чегараси: Агар яхлитлаш фоизни (10% ёки 9%) ошириб юборса
+    # пастга яхлитлаймиз
+    if res_unit > raw_price:
+        # Агар фарқ жуда катта бўлса (масалан 50 сўмдан кўп)
+        # унда мижозга зарар бўлмаслиги учун пастга оламиз
+        if (res_unit - raw_price) > (unit_cost * 0.01): # 1% дан кўп фарқ қилса
+            res_unit = math.floor(raw_price / 100) * 100
+
+    # Таннархдан пастга тушиб кетмаслигини таъминлаш
     if res_unit <= unit_cost:
         res_unit = math.ceil(unit_cost / 100) * 100
 
     pachka_final = res_unit * pack_size
     return int(pachka_final), int(res_unit)
-
-def user_calculate(cost, pack_size, pct):
-    # Фоизли калькулятор учун ҳам 100 сўмлик яхлитлаш
-    pachka_raw = cost * (1 + pct / 100)
-    pachka_final = math.ceil(pachka_raw / 100) * 100
-    
-    dona_raw = pachka_final / (pack_size if pack_size > 0 else 1)
-    dona_final = math.ceil(dona_raw / 100) * 100
-    
-    return int(pachka_final), int(dona_final)
-
 # 5. LOGIN TIZIMI
 if "auth" not in st.session_state: st.session_state["auth"] = False
 
