@@ -5,7 +5,7 @@ import re
 import math
 import hashlib
 import zipfile
-
+from calculations import admin_calculate, user_calculate, get_pack_size
 # 1. SAHIFA SOZLAMALARI
 st.set_page_config(page_title="MEDEXTRA", page_icon="💊", layout="centered")
 
@@ -32,42 +32,6 @@ def load_users_data():
     try: return pd.read_csv(SHEET_URL)
     except: return pd.DataFrame(columns=['phone', 'password', 'name', 'status'])
 
-# 4. МАТЕМАТИК ФУНКЦИЯЛАР (ЯНГИ ВА ХАВФСИЗ ВАРИАНТ)
-def get_pack_size(name):
-    name_upper = str(name).upper()
-    if any(word in name_upper for word in ["САЛФЕТКА", "ЧОЙ", "CHAY", "SALFETKA", "МАРЛЯ", "БИНТ"]): return 1
-    match = re.search(r'[N№](\d+)', name_upper)
-    return int(match.group(1)) if match else 1
-
-def admin_calculate(cost, pack_size):
-    unit_cost = cost / (pack_size if pack_size > 0 else 1)
-    
-    # Фоизни белгилаш
-    if cost > 200000:
-        pct = 1.09  # 9%
-    else:
-        pct = 1.10  # 10%
-    
-    # 1. Фоиз билан ҳисобланган хом нарх
-    raw_price = unit_cost * pct
-    
-    # 2. 100 сўмга юқорига яхлитлаш
-    res_unit = math.ceil(raw_price / 100) * 100
-    
-    # 3. Хавфсизлик чегараси: Агар яхлитлаш фоизни (10% ёки 9%) ошириб юборса
-    # пастга яхлитлаймиз
-    if res_unit > raw_price:
-        # Агар фарқ жуда катта бўлса (масалан 50 сўмдан кўп)
-        # унда мижозга зарар бўлмаслиги учун пастга оламиз
-        if (res_unit - raw_price) > (unit_cost * 0.01): # 1% дан кўп фарқ қилса
-            res_unit = math.floor(raw_price / 100) * 100
-
-    # Таннархдан пастга тушиб кетмаслигини таъминлаш
-    if res_unit <= unit_cost:
-        res_unit = math.ceil(unit_cost / 100) * 100
-
-    pachka_final = res_unit * pack_size
-    return int(pachka_final), int(res_unit)
 # 5. LOGIN TIZIMI
 if "auth" not in st.session_state: st.session_state["auth"] = False
 
