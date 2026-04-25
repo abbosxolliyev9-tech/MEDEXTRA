@@ -3,77 +3,43 @@ import pandas as pd
 import io
 import re
 
-# Boshqa fayllardan funksiyalarni import qilish
+# Papkalardan import qilish
 from calculations.logic import get_pack_size, calculate_logic
 from tizim.auth import apply_design, login_system
 
-# 1. Sahifa sozlamalari
 st.set_page_config(page_title="MEDEXTRA", layout="wide")
-
-# 2. Dizaynni qo'llash
 apply_design()
 
-# 3. Loginni tekshirish
 if login_system():
-    # Sidebar menyusi
-    st.sidebar.title("Menyu")
-    choice = st.sidebar.radio("Bo'limni tanlang:", ["Admin Hisob", "Mijoz Hisob"])
+    st.sidebar.title("MEDEXTRA")
+    choice = st.sidebar.radio("Bo'lim:", ["Admin Hisob", "Mijoz Hisob"])
     
-    if st.sidebar.button("Chiqish"):
-        st.session_state.logged_in = False
-        st.rerun()
-
-    # Asosiy blok
     st.markdown('<div class="main-block">', unsafe_allow_html=True)
     st.title(f"📊 {choice}")
     
-    mode = "admin" if choice == "Admin Hisob" else "mijoz"
-    user_markup = 10
-    if mode == "mijoz":
-        user_markup = st.select_slider("Ustama foizini tanlang (%):", options=list(range(1, 21)), value=10)
-
-    # Fayl yuklash
-    uploaded_file = st.file_uploader("Excel faylni tanlang (xlsx)", type=['xlsx'])
-
+    uploaded_file = st.file_uploader("Excel yuklang", type=['xlsx'])
     if uploaded_file:
         df = pd.read_excel(uploaded_file)
-        cols = df.columns.tolist()
-        
-        c1, c2 = st.columns(2)
-        with c1: col_name = st.selectbox("Dori nomi ustuni:", cols, index=0)
-        with c2: col_cost = st.selectbox("Tannarx ustuni:", cols, index=min(3, len(cols)-1))
-        
-        if st.button("🚀 HISOBLASHNI BOSHLASH"):
+        if st.button("🚀 Hisoblash"):
             p_res, d_res = [], []
             for _, row in df.iterrows():
                 try:
-                    # Narxdagi bo'shliqlarni tozalash
-                    raw_val = str(row[col_cost]).replace(' ', '').replace(',', '.')
-                    cost = float(re.sub(r'[^\d.]', '', raw_val))
-                except:
-                    cost = 0
+                    # Narxdan hamma harflarni olib tashlash, faqat raqam qoldirish
+                    val = re.sub(r'[^\d.]', '', str(row.iloc[3]))
+                    cost = float(val) if val else 0
+                except: cost = 0
                 
-                size = get_pack_size(row[col_name])
-                p_val, d_val = calculate_logic(cost, mode=mode, user_markup=user_markup, pack_size=size)
-                
-                p_res.append(p_val)
-                d_res.append(d_val)
+                size = get_pack_size(row.iloc[0])
+                p, d = calculate_logic(cost, mode="admin" if "Admin" in choice else "mijoz", pack_size=size)
+                p_res.append(p)
+                d_res.append(d)
             
-            df['Pachka Sotuv (Yangi)'] = p_res
-            df['Dona Narxi (Yangi)'] = d_res
+            df['Pachka Sotuv'] = p_res
+            df['Dona Sotuv'] = d_res
+            st.dataframe(df)
             
-            st.success("Muvaffaqiyatli hisoblandi!")
-            st.dataframe(df.head(20)) # Oldindan ko'rish
-            
-            # Excel qilib saqlash
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False)
-            
-            st.download_button(
-                label="📥 Natijani yuklab olish",
-                data=output.getvalue(),
-                file_name=f"medextra_{choice.lower().replace(' ', '_')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            out = io.BytesIO()
+            with pd.ExcelWriter(out, engine='xlsxwriter') as wr:
+                df.to_excel(wr, index=False)
+            st.download_button("📥 Yuklab olish", out.getvalue(), "natija.xlsx")
     st.markdown('</div>', unsafe_allow_html=True)
