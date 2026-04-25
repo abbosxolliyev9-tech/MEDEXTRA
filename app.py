@@ -41,3 +41,27 @@ elif menu == "⚙️ Панел":
     st.header("⚙️ Бошқарув панели")
     база = auth.маълумотларни_юклаш()
     st.dataframe(база)
+def apply_style():
+    bg_url = "https://raw.githubusercontent.com/abbosxolliyev9-tech/MEDEXTRA/main/pexels-eren-34577902.jpg"
+    st.markdown(f"""
+        <style>
+        .stApp {{
+            background: url("{bg_url}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }}
+        .blue-label {{
+            background: rgba(0, 74, 153, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            border: 1px solid white;
+            margin-bottom: 20px;
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+
+apply_style()
