@@ -4,9 +4,9 @@ import requests
 
 # Google Sheets маълумотлари
 БАЗА_URL = "https://docs.google.com/spreadsheets/d/1XyO5EqqDonEfQnmqr8j7SQNbVcx2SC93txhFVHoDGQA/export?format=csv"
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz3Gk37aag317WPVwDaZTBCLr-ylpddGK7WR_10vYKkYF8luaN73NBOjHls6U5cvmq/exec"
+# Охирги олинган Google Script URL линки
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwd02yRjdUap_qf72Gq-LXsnoRdE78XrDhViUr-eOCiWDF19nAg8rTKnqJtEBuhdf3A/exec"
 
-# МАНА ШУ ФУНКЦИЯ СИЗДА ЙЎҚ ЭДИ (ХАТОНИНГ САБАБИ ШУ):
 def сессияни_тайёрлаш():
     if "auth" not in st.session_state:
         st.session_state["auth"] = False
@@ -24,8 +24,8 @@ def маълумотларни_юклаш():
         return pd.DataFrame()
 
 def кириш_ойнаси():
-    st.markdown('<div style="text-align: center; color: white;"><h1>🏥 MEDEXTRA Тизими</h1></div>', unsafe_allow_html=True)
-    б1, б2 = st.tabs(["🔑 Кириш", "📝 Рўйхатдан ўтиш"])
+    st.markdown('<div class="blue-label"><h1>🔑 Тизимга кириш</h1></div>', unsafe_allow_html=True)
+    б1, б2 = st.tabs(["🔒 Кириш", "📝 Рўйхатдан ўтиш"])
     
     with б1:
         тел = st.text_input("Логин (Телефон)", key="l_u")
@@ -33,43 +33,32 @@ def кириш_ойнаси():
         if st.button("КИРИШ", use_container_width=True):
             база = маълумотларни_юклаш()
             if not база.empty:
-                p_col = 'phone' if 'phone' in база.columns else база.columns[0]
-                қидирув = база[база[p_col].astype(str) == str(тел)]
-                
-                if not қидирув.empty:
-                    pass_col = 'password' if 'password' in база.columns else база.columns[1]
-                    stat_col = 'status' if 'status' in база.columns else база.columns[-1]
-                    
-                    if str(қидирув.iloc[0][pass_col]) == str(парол):
-                        статус = int(қидирув.iloc[0][stat_col])
-                        if статус > 0:
-                            st.session_state["auth"] = True
-                            st.session_state["role"] = статус
-                            st.session_state["user"] = қидирув.iloc[0].get('name', 'User')
-                            st.rerun()
-                        else:
-                            st.warning("⚠️ Сўровингиз ҳали тасдиқланмаган.")
+                қидирув = база[база['phone'].astype(str) == str(тел)]
+                if not қидирув.empty and str(қидирув.iloc[0]['password']) == str(парол):
+                    статус = int(қидирув.iloc[0]['status'])
+                    if статус > 0:
+                        st.session_state["auth"] = True
+                        st.session_state["role"] = статус
+                        st.session_state["user"] = қидирув.iloc[0].get('name', 'User')
+                        st.rerun()
                     else:
-                        st.error("❌ Пароль хато!")
+                        st.warning("⚠️ Сўров тасдиқланмаган.")
                 else:
-                    st.error("❌ Бундай фойдаланувчи топилмади!")
+                    st.error("❌ Логин ёки пароль хато!")
 
     with б2:
-        st.subheader("📝 Рўйхатдан ўтиш учун сўров")
         исм = st.text_input("Исм шарифингиз", key="r_n")
         номер = st.text_input("Телефон рақамингиз", key="r_p")
         янги_парол = st.text_input("Пароль танланг", key="r_pass")
-        
         if st.button("СЎРОВ ЮБОРИШ", use_container_width=True):
             if исм and номер and янги_парол:
                 payload = {"phone": номер, "password": янги_парол, "name": исм}
                 try:
+                    # Google Script-га маълумот юбориш
                     res = requests.post(WEB_APP_URL, json=payload)
                     if res.status_code == 200:
-                        st.success("✅ Сўров юборилди! Энди Панелда кўринади.")
+                        st.success("✅ Сўров юборилди! Админ тасдиқлашини кутинг.")
                     else:
                         st.error("Юборишда хатолик юз берди.")
                 except:
-                    st.error("Серверга уланишда хатолик.")
-            else:
-                st.warning("Илтимос, ҳамма майдонларни тўлдиринг!")
+                    st.error("Сервер билан алоқа йўқ.")
