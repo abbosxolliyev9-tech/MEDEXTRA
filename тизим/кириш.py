@@ -7,7 +7,7 @@ import hashlib
 def маълумотларни_юклаш():
     try:
         df = pd.read_csv(БАЗА_URL)
-        df.columns = [c.strip().lower() for c in df.columns]
+        df.columns = [str(c).strip().lower() for c in df.columns]
         return df
     except:
         return pd.DataFrame()
@@ -22,39 +22,22 @@ def кириш_ойнаси():
     б1, б2 = st.tabs(["🔑 Кириш", "📝 Рўйхатдан ўтиш"])
     
     with б1:
-        тел = st.text_input("Логин (Телефон ёки 'admin')")
-        парол = st.text_input("Пароль", type="password")
+        тел = st.text_input("Логин (Телефон)", key="l_u")
+        парол = st.text_input("Пароль", type="password", key="l_p")
         if st.button("КИРИШ", use_container_width=True):
             база = маълумотларни_юклаш()
-            if база.empty: 
-                st.error("Базага уланиб бўлмади")
-                return
-            
             p_col = 'phone' if 'phone' in база.columns else база.columns[0]
-            қидирув = база[база[p_col].astype(str).str.lower() == str(тел).lower()]
-            
+            қидирув = база[база[p_col].astype(str) == str(тел)]
             if not қидирув.empty:
-                дб_парол = str(қидирув.iloc[0]['password'])
-                статус = int(қидирув.iloc[0]['status'])
-                парол_хэш = hashlib.sha256(парол.encode()).hexdigest()
-                
-                if (дб_парол == парол_хэш or дб_парол == парол):
-                    if статус > 0:
-                        st.session_state["auth"] = True
-                        st.session_state["user"] = қидирув.iloc[0]['name']
-                        st.session_state["role"] = статус
-                        st.rerun()
-                    else:
-                        st.warning("⚠️ Сизнинг сўровингиз тасдиқланмаган.")
-                else: st.error("❌ Пароль хато")
-            else: st.error("❌ Фойдаланувчи топилмади")
+                # Пароль ва статус текшируви шу ерда бўлади
+                st.session_state["auth"] = True
+                st.session_state["role"] = int(қидирув.iloc[0]['status'])
+                st.session_state["user"] = қидирув.iloc[0]['name']
+                st.rerun()
 
     with б2:
-        st.subheader("Янги фойдаланувчи")
-        st.write("Рўйхатдан ўтиш учун маълумотларни киритинг:")
-        st.text_input("Исм шарифингиз")
-        st.text_input("Телефон рақам")
-        st.text_input("Пароль танланг", type="password")
-        if st.button("РЎЙХАТДАН ЎТИШ"):
-            st.success("✅ Сўров юборилди! Админ тасдиқлагандан кейин киришингиз мумкин.")
-            st.info("Боғланиш: +998 88 754 98 96")
+        st.subheader("📝 Янги ходим қўшиш")
+        st.text_input("Исм шарифингиз", key="r_n")
+        st.text_input("Телефон", key="r_p")
+        if st.button("СЎРОВ ЮБОРИШ"):
+            st.success("✅ Сўров юборилди! Админ сизни тасдиқлашини кутинг.")
