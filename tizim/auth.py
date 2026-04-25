@@ -1,7 +1,6 @@
 import streamlit as st
 
 def apply_design():
-    """Sayt dizayni (CSS)"""
     st.markdown("""
         <style>
         .stApp {
@@ -26,7 +25,6 @@ def apply_design():
     """, unsafe_allow_html=True)
 
 def login_system():
-    """Oddiy login tizimi"""
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
 
@@ -37,11 +35,11 @@ def login_system():
             user = st.text_input("Login")
             pwd = st.text_input("Parol", type="password")
             if st.button("Kirish"):
-                if user == "admin" and pwd == "123": # Parolni o'zgartirishingiz mumkin
+                if user == "admin" and pwd == "123":
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
-                    st.error("Login yoki parol xato!")
+                    st.error("Xato!")
             st.markdown('</div>', unsafe_allow_html=True)
         return False
     return True
