@@ -1,6 +1,6 @@
 streamlit
 pandas
-openpyxl
 xlsxwriter
-pdfplumber
-requests
+openpyxl
+gspread
+oauth2client
