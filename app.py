@@ -3,97 +3,99 @@ import pandas as pd
 import io
 import re
 import math
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
-# --- SAYT SOZLAMALARI ---
-st.set_page_config(page_title="MEDEXTRA | Professional Tizim", layout="wide")
+# 1. САҲИФА СОЗЛАМАЛАРИ ВА ДИЗАЙН (ФОН ВА ТУГМАЛАР)
+st.set_page_config(page_title="MEDEXTRA", layout="wide")
 
-# Orqa fon va dizayn uchun CSS
 st.markdown("""
     <style>
-    .main {
-        background-color: #0e1117;
+    .stApp {
+        background-image: url("https://images.unsplash.com/photo-1587854692152-cbe660feec90?q=80&w=2070");
+        background-size: cover;
+    }
+    .main-block {
+        background: rgba(0, 0, 0, 0.8);
+        padding: 25px;
+        border-radius: 15px;
+        color: white;
     }
     .stButton>button {
-        width: 100%;
-        border-radius: 5px;
-        height: 3em;
-        background-color: #ff4b4b;
+        background-color: #27AE60;
         color: white;
+        border-radius: 8px;
+        height: 3em;
+        width: 100%;
+        font-weight: bold;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNKSIYALAR ---
+st.title("💊 MEDEXTRA: Aqlli Hisob-Kitob")
+
+# 2. МАНТИҚИЙ ФУНКЦИЯЛАР
 def get_pack_size(name):
     match = re.search(r'[N№](\d+)', str(name).upper())
     return int(match.group(1)) if match else 1
 
-def calculate_med_logic(cost, size):
-    # Pachka narxi: 12% ustama va 100 ga tepaga yaxlitlash
-    pachka_final = math.ceil((cost * 1.12) / 100) * 100
-    # Dona narxi: Pachka / dona soni va 100 ga tepaga yaxlitlash
-    dona_final = math.ceil((pachka_final / size) / 100) * 100
-    return pachka_final, dona_final
+def calculate_prices(cost, pack_size, markup_percent):
+    if cost <= 0: return 0, 0
+    # Фоизни қўллаш ва 50 сўмга тепага яхлитлаш
+    pachka_raw = cost * (1 + markup_percent / 100)
+    pachka_final = math.ceil(pachka_raw / 50) * 50
+    # Дона нархи ва 50 сўмга тепага яхлитлаш
+    dona_raw = pachka_final / pack_size
+    dona_final = math.ceil(dona_raw / 50) * 50
+    return int(pachka_final), int(dona_final)
 
-# --- MENU STRUKTURASI ---
-menu = ["Mijoz Hisob-kitob", "Admin Panel", "Google Sheets Ma'lumotlari"]
-choice = st.sidebar.selectbox("Bo'limni tanlang", menu)
+# 3. РЕЖИМ ТАНЛАШ (SIDEBAR)
+st.sidebar.header("⚙️ SOZLAMALAR")
+mode = st.sidebar.radio("Ish rejimini tanlang:", ["👤 Mijoz (Erkin foiz)", "🔐 Admin (Maxsus qoida)"])
 
-# --- 1. MIJOZ BO'LIMI ---
-if choice == "Mijoz Hisob-kitob":
-    st.title("💊 MEDEXTRA Mijozlar Bo'limi")
-    st.write("Excel faylni yuklang va narxlarni avtomatik hisoblang.")
+if mode == "👤 Mijoz (Erkin foiz)":
+    st.subheader("👤 Mijozlar uchun hisob-kitob")
+    user_markup = st.select_slider("Ustama фоизини танланг (%):", options=list(range(1, 21)), value=10)
+else:
+    st.subheader("🔐 Admin uchun maxsus қоида")
+    st.info("Қоида: 300 000 дан пастга 10%, тепасига 8%. Яхлитлаш: 50 сўм.")
+
+# 4. ФАЙЛ БИЛАН ИШЛАШ
+uploaded_file = st.file_uploader("Excel (.xlsx) файлни юкланг", type=['xlsx'])
+
+if uploaded_file:
+    df = pd.read_excel(uploaded_file)
+    cols = df.columns.tolist()
     
-    uploaded_file = st.file_uploader("Faylni tanlang", type=['xlsx'])
+    col_name = st.selectbox("Dori nomi (A):", cols, index=0)
+    col_cost = st.selectbox("Tannarx (D):", cols, index=3 if len(cols)>3 else 0)
     
-    if uploaded_file:
-        df = pd.read_excel(uploaded_file)
-        cols = df.columns.tolist()
+    if st.button("🚀 ХИСОБЛАШНИ БОШЛАШ"):
+        p_list, d_list = [], []
         
-        c1, c2 = st.columns(2)
-        with c1: col_name = st.selectbox("Dori nomi ustuni:", cols, index=0)
-        with c2: col_cost = st.selectbox("Tannarx ustuni (D):", cols, index=3 if len(cols)>3 else 0)
+        for _, row in df.iterrows():
+            try:
+                val = str(row[col_cost]).replace(' ', '').replace(',', '.')
+                cost = float(re.sub(r'[^\d.]', '', val))
+            except: cost = 0
+            
+            size = get_pack_size(row[col_name])
+            
+            # Режимга қараб фоиз белгилаш
+            if mode == "🔐 Admin (Maxsus qoida)":
+                current_markup = 8 if cost >= 300000 else 10
+            else:
+                current_markup = user_markup
+            
+            p_val, d_val = calculate_prices(cost, size, current_markup)
+            p_list.append(p_val)
+            d_list.append(d_val)
+            
+        df['Pachka Sotuv (H)'] = p_list
+        df['Dona Narxi (I)'] = d_list
         
-        if st.button("🚀 HISOB-KITOBNI BOSHLASH"):
-            p_list, d_list = [], []
-            for _, row in df.iterrows():
-                try:
-                    val = str(row[col_cost]).replace(' ', '').replace(',', '.')
-                    cost = float(re.sub(r'[^\d.]', '', val))
-                except: cost = 0
-                
-                size = get_pack_size(row[col_name])
-                p_price, d_price = calculate_med_logic(cost, size)
-                p_list.append(p_price)
-                d_list.append(d_price)
-            
-            df['Sotuv Narxi (Pachka)'] = p_list
-            df['Sotuv Narxi (Dona)'] = d_list
-            
-            st.success("Hisoblash yakunlandi!")
-            st.dataframe(df)
-            
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False)
-            st.download_button("📥 Natijani yuklab olish", output.getvalue(), "medextra_hisob.xlsx")
-
-# --- 2. ADMIN PANEL ---
-elif choice == "Admin Panel":
-    st.title("🔐 Admin Boshqaruvi")
-    password = st.text_input("Parolni kiriting", type="password")
-    if password == "admin777": # Parolni o'zingizga moslang
-        st.write("Tizim sozlamalari va statistikasi bu yerda ko'rinadi.")
-        st.metric(label="Jami hisob-kitoblar", value="120")
-    elif password:
-        st.error("Parol noto'g'ri!")
-
-# --- 3. GOOGLE SHEETS ---
-elif choice == "Google Sheets Ma'lumotlari":
-    st.title("📊 Google Sheets integratsiyasi")
-    st.write("Bu bo'limda kelib tushgan so'rovlar ko'rinadi.")
-    # Google Sheets ulanishi uchun json fayl va sozlamalar kerak
-    st.info("Google Sheets ma'lumotlarini ko'rish uchun creds.json sozlanishi kerak.")
-    # (Bu yerga Google Sheets ulanish kodlarini qo'shishingiz mumkin)
+        st.success(f"Natija tayyor! ({mode} rejimi)")
+        st.dataframe(df)
+        
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False)
+        st.download_button("📥 Натижани юклаб олиш", output.getvalue(), "medextra_natija.xlsx")
