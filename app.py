@@ -5,11 +5,15 @@ import re
 import math
 import hashlib
 import zipfile
+# 1. Ҳисоб-китоб блоки
 from calculations.logic import admin_calculate, user_calculate, get_pack_size
-# 1. SAHIFA SOZLAMALARI
+# 2. ТИЗИМ (Кириш/Чиқиш) блоки - Янги папкадан чақириш
+from тизим.кириш import сессияни_тайёрлаш, чиқиш_тугмаси, кириш_ойнаси
+
+# --- САҲИФА СОЗЛАМАЛАРИ ---
 st.set_page_config(page_title="MEDEXTRA", page_icon="💊", layout="centered")
 
-# 2. DIZAYN
+# --- ДИЗАЙН ---
 def add_custom_style():
     bg_image = "https://raw.githubusercontent.com/abbosxolliyev9-tech/MEDEXTRA/main/pexels-eren-34577902.jpg"
     st.markdown(f"""
@@ -25,42 +29,28 @@ def add_custom_style():
 
 add_custom_style()
 
-# 3. GOOGLE SHEETS ULANISHI
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1XyO5EqqDonEfQnmqr8j7SQNbVcx2SC93txhFVHoDGQA/export?format=csv"
+# --- ТИЗИМНИ ИШГА ТУШИРИШ ---
+сессияни_тайёрлаш()
 
-def load_users_data():
-    try: return pd.read_csv(SHEET_URL)
-    except: return pd.DataFrame(columns=['phone', 'password', 'name', 'status'])
-
-# 5. LOGIN TIZIMI
-if "auth" not in st.session_state: st.session_state["auth"] = False
-
-if not st.session_state["auth"]:
-    tab_log, _ = st.tabs(["🔑 КИРИШ", "📝 РЎЙХАТДАН ЎТИШ"])
-    with tab_log:
-        st.markdown('<div class="blue-label">Тизимга кириш</div>', unsafe_allow_html=True)
-        login_u = st.text_input("Логин / Телефон")
-        login_p = st.text_input("Парол", type="password")
-        if st.button("КИРИШ"):
-            users_df = load_users_data()
-            entered_hash = hashlib.sha256(login_p.encode()).hexdigest()
-            user_row = users_df[users_df['phone'].astype(str) == str(login_u)]
-            if not user_row.empty:
-                db_pass = str(user_row.iloc[0]['password'])
-                if (db_pass == entered_hash or db_pass == login_p) and int(user_row.iloc[0]['status']) > 0:
-                    st.session_state["auth"] = True
-                    st.session_state["role"] = int(user_row.iloc[0]['status'])
-                    st.rerun()
-                else: st.error("Парол хато ёки статус актив эмас!")
-            else: st.error("Фойдаланувчи топилмади!")
+# Агар фойдаланувчи кирмаган бўлса, кириш ойнасини кўрсатиш ва тўхтатиш
+if not st.session_state.get("auth"):
+    кириш_ойнаси()
     st.markdown('<div class="contact-box">📞 Боғланиш: +998 88 754 98 96</div>', unsafe_allow_html=True)
     st.stop()
 
-# 6. MENU (SIDEBAR)
-st.sidebar.title("💎 MEDEXTRA")
-menu = st.sidebar.radio("Бўлим:", ["🚀 Админ Ҳисоб", "📊 Фоизли Кальк", "⚙️ Панел"] if st.session_state.get("role") == 9 else ["📊 Фоизли Кальк"])
+# Агар кирган бўлса, Sidebar-да чиқиш тугмасини чиқариш
+чиқиш_тугмаси()
 
-# 7. ИШЧИ ҚИСМЛАР
+# --- GOOGLE SHEETS ВА МЕНЮ ---
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1XyO5EqqDonEfQnmqr8j7SQNbVcx2SC93txhFVHoDGQA/export?format=csv"
+
+st.sidebar.title("💎 MEDEXTRA")
+# Рольни текшириш (Админ ёки Оддий фойдаланувчи)
+role = st.session_state.get("user")
+menu_options = ["🚀 Админ Ҳисоб", "📊 Фоизли Кальк", "⚙️ Панел"] if role == "Администратор" else ["📊 Фоизли Кальк"]
+menu = st.sidebar.radio("Бўлим:", menu_options)
+
+# --- ИШЧИ ҚИСМЛАР ---
 if menu in ["🚀 Админ Ҳисоб", "📊 Фоизли Кальк"]:
     title = "АДМИН ҲИСОБЛАШ (14-12-10%)" if menu == "🚀 Админ Ҳисоб" else "ИХТИЁРИЙ ФОИЗЛИ ҲИСОБЛАШ"
     st.markdown(f'<div class="blue-label">{title}</div>', unsafe_allow_html=True)
@@ -68,11 +58,9 @@ if menu in ["🚀 Админ Ҳисоб", "📊 Фоизли Кальк"]:
     if menu == "📊 Фоизли Кальк":
         user_pct = st.slider("Устама фоизини танланг:", 1, 25, 12)
     
-    # Кўп файл юклаш имконияти
     uploaded_files = st.file_uploader("Excel файлларни юкланг", type=['xlsx'], accept_multiple_files=True)
     
     if uploaded_files:
-        # Биринчи файлдан устунларни аниқлаб оламиз
         sample_df = pd.read_excel(uploaded_files[0])
         cols = sample_df.columns.tolist()
         
@@ -82,7 +70,6 @@ if menu in ["🚀 Админ Ҳисоб", "📊 Фоизли Кальк"]:
         
         if st.button("🚀 ҲАММАСИНИ ҲИСОБЛАШ ВА ZIP ҚИЛИШ"):
             zip_buffer = io.BytesIO()
-            
             with zipfile.ZipFile(zip_buffer, "w") as zf:
                 for f in uploaded_files:
                     try:
@@ -98,24 +85,15 @@ if menu in ["🚀 Админ Ҳисоб", "📊 Фоизли Кальк"]:
                             except: p_l.append(0); d_l.append(0)
                         
                         df['Sotuv_Pachka'], df['Sotuv_Dona'] = p_l, d_l
-                        
-                        # Файлни хотирада сақлаш
                         excel_out = io.BytesIO()
                         with pd.ExcelWriter(excel_out, engine='xlsxwriter') as wr:
                             df.to_excel(wr, index=False)
-                        
-                        # ZIP ичига қўшиш
                         zf.writestr(f"Tayyor_{f.name}", excel_out.getvalue())
                     except Exception as e:
                         st.error(f"Хатолик: {f.name} - {e}")
             
-            st.success(f"✅ {len(uploaded_files)} та файл муваффақиятли ҳисобланди!")
-            st.download_button(
-                label="📥 ZIP АРХИВНИ ЮКЛАБ ОЛИШ",
-                data=zip_buffer.getvalue(),
-                file_name="MedExtra_Natijalar.zip",
-                mime="application/zip"
-            )
+            st.success(f"✅ {len(uploaded_files)} та файл ҳисобланди!")
+            st.download_button(label="📥 ZIP ЮКЛАШ", data=zip_buffer.getvalue(), file_name="Natijalar.zip", mime="application/zip")
 
 elif menu == "⚙️ Панел":
     st.markdown('<div class="blue-label">⚙️ БОШҚАРУВ</div>', unsafe_allow_html=True)
