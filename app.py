@@ -3,9 +3,9 @@ import pandas as pd
 from calculations.logic import process_excel_files
 # Папка номлари инглизча бўлгани хатосиз ишлашини таъминлайди
 try:
-    from tizim.auth import сессияни_тайёрлаш, кириш_ойнаси, маълумотларни_юклаш
+    from тизим.auth import сессияни_тайёрлаш, кириш_ойнаси, маълумотларни_юклаш
 except:
-    from тизим.кириш import сессияни_тайёрлаш, кириш_ойнаси, маълумотларни_юклаш
+    from тизим.кириш.py import сессияни_тайёрлаш, кириш_ойнаси, маълумотларни_юклаш
 
 # 1. Саҳифа созламалари
 st.set_page_config(page_title="MEDEXTRA", page_icon="💊", layout="wide")
