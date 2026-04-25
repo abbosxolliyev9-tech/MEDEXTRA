@@ -1,63 +1,43 @@
 import re
 import math
-import pandas as pd
-import io
-import zipfile
-
-# СОЗЛАМАЛАР
-CHEGARA_NARX = 200000
-PAST_FOIZ = 1.10
-BALAND_FOIZ = 1.09
 
 def get_pack_size(name):
-    name_upper = str(name).upper()
-    if any(word in name_upper for word in ["САЛФЕТКА", "ЧОЙ", "CHAY", "SALFETKA", "МАРЛЯ", "БИНТ"]):
-        return 1
-    match = re.search(r'[N№](\d+)', name_upper)
-    return int(match.group(1)) if match else 1
+    """
+    Dori nomidan №8, №10 yoki N30 kabi sonni qidirib topadi.
+    Agar topilmasa, dori 1 dona deb hisoblanadi.
+    """
+    name_str = str(name).upper()
+    # № yoki N dan keyin kelgan raqamlarni ushlab oladi
+    match = re.search(r'[N№](\d+)', name_str)
+    if match:
+        return int(match.group(1))
+    return 1
 
-def admin_calculate(cost, pack_size):
-    unit_cost = cost / (pack_size if pack_size > 0 else 1)
-    pct = BALAND_FOIZ if cost > CHEGARA_NARX else PAST_FOIZ
-    limit_price = unit_cost * pct
-    res_unit = math.ceil(limit_price / 100) * 100
-    if res_unit > limit_price:
-        res_unit = math.floor(limit_price / 100) * 100
-    if res_unit <= unit_cost:
-        res_unit = math.ceil(unit_cost / 100) * 100
-    return int(res_unit * pack_size), int(res_unit)
+def calculate_logic(cost, mode="admin", user_markup=10, pack_size=1):
+    """
+    Asosiy hisob-kitob mantiqi.
+    cost: Tannarx
+    mode: "admin" yoki "mijoz"
+    user_markup: Mijoz tanlagan foiz (1-20)
+    pack_size: № soni
+    """
+    if cost <= 0:
+        return 0, 0
 
-def user_calculate(cost, pack_size, pct):
-    pachka_raw = cost * (1 + pct / 100)
+    # 1. Ustama foizini aniqlash
+    if mode == "admin":
+        # Admin qoidasi: 300 000 dan tepa 8%, past 10%
+        markup = 1.08 if cost >= 300000 else 1.10
+    else:
+        # Mijoz rejimi: foydalanuvchi tanlagan foiz
+        markup = 1 + (user_markup / 100)
+
+    # 2. Pachka narxini hisoblash va 100 so'mga tepaga yaxlitlash
+    pachka_raw = cost * markup
     pachka_final = math.ceil(pachka_raw / 100) * 100
-    dona_raw = pachka_final / (pack_size if pack_size > 0 else 1)
-    dona_final = math.ceil(dona_raw / 100) * 100
-    return int(pachka_final), int(dona_final)
 
-# ЯНГИ: Файлларни қайта ишлаш функцияси
-def process_excel_files(uploaded_files, menu_type, col_n, col_c, user_pct=None):
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w") as zf:
-        for f in uploaded_files:
-            df = pd.read_excel(f)
-            p_l, d_l = [], []
-            for _, row in df.iterrows():
-                try:
-                    cost = float(re.sub(r'[^\d.]', '', str(row[col_c]).replace(',','.')))
-                    pack = get_pack_size(row[col_n])
-                    if menu_type == "🚀 Админ Ҳисоб":
-                        p_f, d_f = admin_calculate(cost, pack)
-                    else:
-                        p_f, d_f = user_calculate(cost, pack, user_pct)
-                    p_l.append(p_f); d_l.append(d_f)
-                except:
-                    p_l.append(0); d_l.append(0)
-            
-            df['Sotuv_Pachka'] = p_l
-            df['Sotuv_Dona'] = d_l
-            
-            excel_out = io.BytesIO()
-            with pd.ExcelWriter(excel_out, engine='xlsxwriter') as wr:
-                df.to_excel(wr, index=False)
-            zf.writestr(f"Tayyor_{f.name}", excel_out.getvalue())
-    return zip_buffer.getvalue()
+    # 3. Dona narxini hisoblash va 100 so'mga tepaga yaxlitlash
+    dona_raw = pachka_final / pack_size
+    dona_final = math.ceil(dona_raw / 100) * 100
+
+    return int(pachka_final), int(dona_final)
