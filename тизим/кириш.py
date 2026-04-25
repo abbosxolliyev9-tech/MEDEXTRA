@@ -2,19 +2,20 @@ import streamlit as st
 import pandas as pd
 import hashlib
 
-# 1. МАЪЛУМОТЛАР БАЗАСИ (GOOGLE SHEETS)
+# 1. МАЪЛУМОТЛАР БАЗАСИ
 БАЗА_URL = "https://docs.google.com/spreadsheets/d/1XyO5EqqDonEfQnmqr8j7SQNbVcx2SC93txhFVHoDGQA/export?format=csv"
 
 def маълумотларни_юклаш():
     try:
-        # Кешдан фойдаланмай янги маълумотларни олиш
-        return pd.read_csv(БАЗА_URL)
+        df = pd.read_csv(БАЗА_URL)
+        # Устун номларидаги бўш жойларни олиб ташлаймиз
+        df.columns = [c.strip().lower() for c in df.columns]
+        return df
     except Exception as e:
         st.error(f"Базага уланишда хатолик: {e}")
-        return pd.DataFrame(columns=['phone', 'password', 'name', 'status'])
+        return pd.DataFrame()
 
 def сессияни_тайёрлаш():
-    """Сайт юкланганда хотирани созлаш"""
     if "auth" not in st.session_state:
         st.session_state["auth"] = False
     if "user" not in st.session_state:
@@ -23,72 +24,59 @@ def сессияни_тайёрлаш():
         st.session_state["role"] = 0
 
 def чиқиш_тугмаси():
-    """Sidebar-да чиқиш тугмасини чиқариш"""
     if st.session_state.get("auth"):
         st.sidebar.markdown("---")
-        st.sidebar.write(f"👤 Фойдаланувчи: **{st.session_state['user']}**")
-        if st.sidebar.button("🚪 Тизимдан чиқиш"):
+        st.sidebar.write(f"👤: **{st.session_state['user']}**")
+        if st.sidebar.button("🚪 Чиқиш"):
             st.session_state["auth"] = False
-            st.session_state["user"] = None
-            st.session_state["role"] = 0
             st.rerun()
 
 def кириш_ойнаси():
-    """Асосий кириш ва рўйхатдан ўтиш интерфейси"""
-    st.markdown('<div style="text-align: center;"><h1>🏥 MEDEXTRA Тизими</h1></div>', unsafe_allow_html=True)
-    
+    st.markdown('<div style="text-align: center;"><h1>🏥 MEDEXTRA</h1></div>', unsafe_allow_html=True)
     бўлим1, бўлим2 = st.tabs(["🔑 Кириш", "📝 Рўйхатдан ўтиш"])
 
     with бўлим1:
-        st.markdown("### Тизимга кириш")
-        тел = st.text_input("Логин ёки Телефон", placeholder="Масалан: admin ёки 998901234567", key="input_login")
-        парол = st.text_input("Пароль", type="password", key="input_pass")
+        тел = st.text_input("Логин (Телефон)", key="l_phone")
+        парол = st.text_input("Пароль", type="password", key="l_pass")
         
         if st.button("КИРИШ", use_container_width=True):
             база = маълумотларни_юклаш()
             
-            # Киритилган паролни шифрлаш
+            if база.empty:
+                st.error("База бўш ёки юкланмади!")
+                return
+
+            # Пароль хэши
             парол_хэш = hashlib.sha256(парол.encode()).hexdigest()
             
-            # Логин бўйича қидириш (Телефон ёки 'admin' сўзи бўйича)
-            қидирув = база[(база['phone'].astype(str).lower() == str(тел).lower())]
+            # Устун номини аниқлаймиз (phone ёки телефон бўлиши мумкин)
+            phone_col = 'phone' if 'phone' in база.columns else база.columns[0]
+            
+            # Қидирув
+            қидирув = база[база[phone_col].astype(str).str.lower() == str(тел).lower()]
             
             if not қидирув.empty:
-                дб_парол = str(қидирув.iloc[0]['password'])
-                статус = int(қидирув.iloc[0]['status'])
-                исм = қидирув.iloc[0]['name']
+                # Пароль ва статус устунларини топамиз
+                pass_col = 'password' if 'password' in база.columns else база.columns[1]
+                stat_col = 'status' if 'status' in база.columns else база.columns[-1]
+                name_col = 'name' if 'name' in база.columns else база.columns[2]
                 
-                # ПАРОЛЬ ВА СТАТУСНИ ТЕКШИРИШ
+                дб_парол = str(қидирув.iloc[0][pass_col])
+                статус = int(қидирув.iloc[0][stat_col])
+                
                 if (дб_парол == парол_хэш or дб_парол == парол):
                     if статус > 0:
                         st.session_state["auth"] = True
-                        st.session_state["user"] = исм
+                        st.session_state["user"] = қидирув.iloc[0][name_col]
                         st.session_state["role"] = статус
-                        st.success(f"Хуш келибсиз, {исм}!")
+                        st.success("Хуш келибсиз!")
                         st.rerun()
                     else:
-                        # Статус 0 бўлган ҳолат
-                        st.warning("⚠️ Сизнинг сўровингиз ҳали тасдиқланмаган. Илтимос, админ тасдиқлашини кутинг.")
+                        st.warning("⚠️ Статусингиз актив эмас!")
                 else:
                     st.error("❌ Пароль хато!")
             else:
-                st.error("❌ Бундай логинли фойдаланувчи топилмади!")
+                st.error("❌ Фойдаланувчи топилмади!")
 
     with бўлим2:
-        st.subheader("📝 Янги ҳисоб учун сўров")
-        янги_исм = st.text_input("Исм шарифингиз")
-        янги_тел = st.text_input("Телефон рақамингиз (Кейинчалик логин бўлади)")
-        янги_парол = st.text_input("Пароль танланг", type="password")
-        
-        if st.button("СЎРОВ ЮБОРИШ", use_container_width=True):
-            if янги_исм and янги_тел and янги_парол:
-                st.info(f"✅ Ҳурматли {янги_исм}, сўровингиз юборилди!")
-                st.success("Админ сизни жадвалда тасдиқлаши (статусни 1 қилиши) билан тизимга кира оласиз.")
-                st.markdown("""
-                **Кейинги қадамлар:**
-                1. Рақамингизни админга айтинг.
-                2. Админ сизни базага қўшиб, статус беради.
-                3. Кейин 'Кириш' бўлими орқали киринг.
-                """)
-            else:
-                st.error("Илтимос, ҳамма катакларни тўлдиринг!")
+        st.info("📝 Рўйхатдан ўтиш учун Администраторга мурожаат қилинг.")
