@@ -1,107 +1,68 @@
 import streamlit as st
 import pandas as pd
-import os
+import io
+import re
+import math
 
-# 1. Папкалардан функцияларни импорт қилиш
-try:
-    from tizim import auth #
-    from calculations.logic import process_excel_files #
-except ImportError:
-    st.error("❌ Хатолик: 'tizim' ёки 'calculations' папкаси топилмади.")
-    st.stop()
+st.set_page_config(page_title="MEDEXTRA | Professional", layout="wide")
+st.title("💊 MEDEXTRA: Aqlli Hisob-Kitob Tizimi")
 
-# 2. Саҳифа конфигурацияси
-st.set_page_config(page_title="MEDEXTRA", layout="wide")
+def get_pack_size(name):
+    """Dori nomidan №8, №10 kabi dona sonini topish"""
+    name_str = str(name).upper()
+    match = re.search(r'[N№](\d+)', name_str)
+    return int(match.group(1)) if match else 1
 
-# 3. Дизайн ва Орқа фон
-def apply_style():
-    # GitHub'даги расм линки
-    bg_url = "https://raw.githubusercontent.com/abbosxolliyev9-tech/MEDEXTRA/main/pexels-eren-34577902.jpg"
-    st.markdown(f"""
-        <style>
-        .stApp {{
-            background: url("{bg_url}");
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-        }}
-        .main-panel {{
-            background: rgba(0, 74, 153, 0.85);
-            color: white;
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            margin-bottom: 25px;
-        }}
-        </style>
-        """, unsafe_allow_html=True)
+def calculate_logic(cost):
+    """Siz aytgan formula: 12% ustama va 100 ga tepaga yaxlitlash"""
+    if cost <= 0: return 0
+    # 1. Pachka narxi: Tannarx + 12% va tepaga 100 ga yaxlitlash
+    pachka_final = math.ceil((cost * 1.12) / 100) * 100
+    return pachka_final
 
-apply_style()
+# Faylni yuklash
+uploaded_files = st.file_uploader("Excel fayllarni yuklang", type=['xlsx'], accept_multiple_files=True)
 
-# 4. Тизимни ишга тушириш
-auth.сессияни_тайёрлаш()
-
-# 5. Кириш текшируви
-if not st.session_state.get("auth"):
-    auth.кириш_ойнаси()
-    st.stop()
-
-# 6. Ролларни аниқлаш (Google Sheets-даги 'status' устуни асосида)
-user_role = int(st.session_state.get("role", 0))
-user_name = st.session_state.get("user", "User")
-
-st.sidebar.markdown(f"### 👤 {user_name}")
-
-# МЕНЮ (Админ ва Мижоз учун алоҳида танловлар)
-if user_role == 9: # Админ учун
-    menu = st.sidebar.radio("📌 Бўлимни танланг:", ["🚀 Админ Ҳисоб (10%)", "📊 Мижоз Ҳисоби (Эркин %)", "⚙️ Google Sheets База"])
-else: # Оддий мижоз учун
-    menu = st.sidebar.radio("📌 Бўлимни танланг:", ["📊 Мижоз Ҳисоби (Эркин %)"])
-
-if st.sidebar.button("🚪 Тизимдан чиқиш"):
-    st.session_state["auth"] = False
-    st.rerun()
-
-# --- БЎЛИМЛАРНИНГ ФУНКЦИОНАЛИ ---
-
-# 1. АДМИН МАХСУС ҲИСОБИ (Кечаги 10% лик алгоритм)
-if menu == "🚀 Админ Ҳисоб (10%)":
-    st.markdown('<div class="main-panel"><h1>🚀 Админ Махсус Ҳисоб (10%)</h1></div>', unsafe_allow_html=True)
-    files = st.file_uploader("Excel файлларни юкланг:", type=['xlsx', 'xls'], accept_multiple_files=True, key="admin_up")
-    if files:
-        if st.button("🚀 АДМИН ҲИСОБНИ БОШЛАШ", use_container_width=True):
-            with st.spinner("Админ алгоритми ишламоқда..."):
-                zip_data = process_excel_files(files, 10) # 10% ўзгармас
-                st.success("✅ Админ ҳисоби якунланди!")
-                st.download_button("📥 Натижани юклаб олиш (ZIP)", data=zip_data, file_name="Admin_10pct.zip", use_container_width=True)
-
-# 2. МИЖОЗЛАР ҲИСОБИ (1% дан 20% гача танлаш имконияти)
-elif menu == "📊 Мижоз Ҳисоби (Эркин %)":
-    st.markdown('<div class="main-panel"><h1>📊 Мижозлар учун Ҳисоб-китоб</h1></div>', unsafe_allow_html=True)
-    files = st.file_uploader("Excel файлларни юкланг:", type=['xlsx', 'xls'], accept_multiple_files=True, key="client_up")
-    if files:
-        # Мижоз ўзи учун фоиз танлайди
-        client_pct = st.select_slider("Керакли фоизни танланг:", options=list(range(1, 21)), value=12)
-        if st.button("🚀 ҲИСОБЛАШНИ БОШЛАШ", use_container_width=True):
-            with st.spinner(f"{client_pct}% билан ҳисобланмоқда..."):
-                zip_data = process_excel_files(files, client_pct)
-                st.success(f"✅ {client_pct}% билан тайёр бўлди!")
-                st.download_button("📥 Натижани юклаб олиш (ZIP)", data=zip_data, file_name=f"Mijoz_{client_pct}pct.zip", use_container_width=True)
-
-# 3. GOOGLE SHEETS БАЗАСИ (ФАҚАТ АДМИН УЧУН)
-elif menu == "⚙️ Google Sheets База":
-    st.markdown('<div class="main-panel"><h1>⚙️ Google Sheets: Фойдаланувчилар Базаси</h1></div>', unsafe_allow_html=True)
-    st.info("ℹ️ Бу ерда Google Sheets-даги барча рўйхатдан ўтганлар кўринади.")
-    
-    try:
-        # Google Sheets-дан маълумотларни юклаш
-        df_base = auth.маълумотларни_юклаш() 
-        if not df_base.empty:
-            st.dataframe(df_base, use_container_width=True) #
-            st.divider()
-            st.write("🔗 [Google Sheets-га ўтиш ва тасдиқлаш](https://docs.google.com/spreadsheets/d/1XyO5EqqDonEfQnmqr8j7SQNbVcx2SC93txhFVHoDGQA/edit)")
-        else:
-            st.warning("База бўш.")
-    except Exception as e:
-        st.error(f"Базани юклашда хато: {e}")
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        try:
+            df = pd.read_excel(uploaded_file)
+            cols = df.columns.tolist()
+            
+            st.write(f"📁 Fayl: {uploaded_file.name}")
+            col_name = st.selectbox(f"Dori nomi (A) - {uploaded_file.name}:", cols, index=0)
+            col_cost = st.selectbox(f"Tannarx (D) - {uploaded_file.name}:", cols, index=3 if len(cols)>3 else 0)
+            
+            if st.button(f"🚀 Hisoblash: {uploaded_file.name}"):
+                p_list, d_list = [], []
+                
+                for _, row in df.iterrows():
+                    try:
+                        # Narxni tozalash
+                        raw_v = str(row[col_cost]).replace(' ', '').replace(',', '.')
+                        cost = float(re.sub(r'[^\d.]', '', raw_v))
+                    except: cost = 0
+                    
+                    # 1. Pachka narxini hisoblash (77245 -> 86600)
+                    p_price = calculate_logic(cost)
+                    
+                    # 2. Dona narxini hisoblash (86600 / 8 = 10825 -> 10900)
+                    size = get_pack_size(row[col_name])
+                    d_price = math.ceil((p_price / size) / 100) * 100
+                    
+                    p_list.append(p_price)
+                    d_list.append(d_price)
+                
+                df['Pachka Sotuv (H)'] = p_list
+                df['Dona Narxi (I)'] = d_list
+                
+                st.dataframe(df)
+                
+                # Yuklab olish uchun fayl tayyorlash
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    df.to_excel(writer, index=False)
+                st.download_button(f"📥 {uploaded_file.name} natijasini yuklab olish", output.getvalue(), f"tayyor_{uploaded_file.name}")
+                
+        except Exception as e:
+            st.error(f"Faylni o'qishda xato: {e}")
