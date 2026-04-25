@@ -1,6 +1,7 @@
 import streamlit as st
 
 def apply_design():
+    """Sayt dizayni (CSS)"""
     st.markdown("""
         <style>
         .stApp {
@@ -15,31 +16,32 @@ def apply_design():
             color: white;
             border: 1px solid #27AE60;
         }
+        label, h1, h2, h3, p, span { color: white !important; }
         .stButton>button {
             background-color: #27AE60 !important;
             color: white !important;
-            border-radius: 10px !important;
-            font-weight: bold !important;
+            width: 100%;
         }
-        label, h1, h2, h3, p, span { color: white !important; }
         </style>
     """, unsafe_allow_html=True)
 
 def login_system():
+    """Oddiy login tizimi"""
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
 
     if not st.session_state.logged_in:
-        with st.form("login_form"):
+        with st.container():
+            st.markdown('<div class="main-block">', unsafe_allow_html=True)
             st.title("🔐 Kirish")
             user = st.text_input("Login")
             pwd = st.text_input("Parol", type="password")
-            if st.form_submit_button("Kirish"):
-                if user == "admin" and pwd == "123": # O'zingizga moslang
+            if st.button("Kirish"):
+                if user == "admin" and pwd == "123": # Parolni o'zgartirishingiz mumkin
                     st.session_state.logged_in = True
-                    st.session_state.user_role = "admin"
                     st.rerun()
                 else:
-                    st.error("Xato!")
+                    st.error("Login yoki parol xato!")
+            st.markdown('</div>', unsafe_allow_html=True)
         return False
     return True
