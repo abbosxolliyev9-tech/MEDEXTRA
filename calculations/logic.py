@@ -1,22 +1,18 @@
-import math
 import re
+import math
 
 def get_pack_size(name):
-    name_str = str(name).upper()
-    match = re.search(r'[N№](\d+)', name_str)
+    match = re.search(r'[N№](\d+)', str(name).upper())
     return int(match.group(1)) if match else 1
 
-def calculate_logic(cost, mode, markup_val=10):
+def calculate_logic(cost, mode="admin", user_markup=10, pack_size=1):
     if cost <= 0: return 0, 0
-    
-    # 1. Admin: >300k бўлса 8%, <300k бўлса 10%
-    if mode == "Админ Ҳисоб":
+    if mode == "admin":
         markup = 1.08 if cost >= 300000 else 1.10
-    # 2. Mijoz: Фоизни ўзи белгилайди
     else:
-        markup = 1 + (markup_val / 100)
-        
+        markup = 1 + (user_markup / 100)
+    
     pachka_raw = cost * markup
-    # 100 сўмга яхлитлаш
     pachka_final = math.ceil(pachka_raw / 100) * 100
-    return int(pachka_final)
+    dona_final = math.ceil((pachka_final / pack_size) / 100) * 100
+    return int(pachka_final), int(dona_final)
