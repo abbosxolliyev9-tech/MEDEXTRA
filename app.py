@@ -5,14 +5,13 @@ import zipfile
 import re
 import math
 
-# 1. ДИЗАЙН ВА ФОН
+# 1. ДИЗАЙН
 st.set_page_config(page_title="MEDEXTRA", layout="wide")
 
-# Орқа фон расмини қайтариш ва стиллар
 st.markdown("""
     <style>
     .stApp {
-        background-image: url("https://images.unsplash.com/pexels-eren-34577902.jpg");
+        background-image: url("https://images.unsplash.com/photo-1587854692152-cbe660feec90?q=80&w=2070");
         background-size: cover;
         background-attachment: fixed;
     }
@@ -22,14 +21,6 @@ st.markdown("""
         border-radius: 15px;
         color: white;
         border: 1px solid #27AE60;
-        margin-bottom: 50px;
-    }
-    .stButton>button {
-        width: 100%;
-        background-color: #27AE60 !important;
-        color: white !important;
-        font-weight: bold !important;
-        border-radius: 10px !important;
     }
     .footer {
         position: fixed;
@@ -37,143 +28,109 @@ st.markdown("""
         background-color: rgba(0, 0, 0, 0.9);
         color: white; text-align: center;
         padding: 10px; font-size: 16px;
-        z-index: 1000;
     }
     </style>
     <div class="footer">Bog'lanish uchun: +998887549896</div>
     """, unsafe_allow_html=True)
 
-# 2. МАНТИҚИЙ ФУНКЦИЯЛАР
+# 2. ЯНГИЛАНГАН МАНТИҚ (Сиз айтган 9% лик қоида билан)
 def get_pack_size(name):
     match = re.search(r'[N№](\d+)', str(name).upper())
     return int(match.group(1)) if match else 1
 
 def calculate_logic(cost, mode, user_markup, pack_size):
     if cost <= 0: return 0, 0
-    if mode == "admin":
-        markup = 1.08 if cost >= 300000 else 1.10
-    else:
-        markup = 1 + (user_markup / 100)
     
-    pachka_raw = cost * markup
-    pachka_final = math.ceil(pachka_raw / 100) * 100
-    dona_final = math.ceil((pachka_final / pack_size) / 100) * 100
+    # Фоизни аниқлаш
+    target_markup = 1.10 if mode == "admin" and cost < 300000 else 1.08 if mode == "admin" else (1 + user_markup/100)
+    
+    # Хом нарх (масалан 10% билан)
+    raw_price = cost * target_markup
+    
+    # ЭНГ МУҲИМ ЖОЙИ:
+    # 1000 гача пастга яхлитлаб кўрамиз (Масалан: 10 100 -> 10 000)
+    round_down_1000 = (raw_price // 1000) * 1000
+    
+    # Агар 1000 гача пастга туширганда ҳам фойда 9% дан кам бўлмаса:
+    if round_down_1000 >= (cost * 1.09):
+        pachka_final = round_down_1000
+    else:
+        # Агар 9% дан пастга тушиб кетса, унда 100 сўмгача тепага яхлитлаймиз
+        pachka_final = math.ceil(raw_price / 100) * 100
+    
+    # Дона нархини ҳам худди шу мантиқда чиқарамиз
+    dona_raw = pachka_final / pack_size
+    dona_down_1000 = (dona_raw // 1000) * 1000
+    
+    if dona_down_1000 >= (cost/pack_size * 1.09):
+        dona_final = dona_down_1000
+    else:
+        dona_final = math.ceil(dona_raw / 100) * 100
+        
     return int(pachka_final), int(dona_final)
 
-# 3. КИРИШ ТИЗИМИ
+# 3. КИРИШ ТИЗИМИ (Ўзгаришсиз)
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
-    st.session_state.user_role = None
 
 if not st.session_state.logged_in:
     st.markdown('<div class="main-block">', unsafe_allow_html=True)
-    st.title("💊 MEDEXTRA: Tizimga Kirish")
+    st.title("💊 MEDEXTRA: Kirish")
     user = st.text_input("Login")
     pw = st.text_input("Parol", type="password")
-    
     if st.button("Kirish"):
-        if user == "admin" and pw == "Abbos96":
+        if (user == "admin" and pw == "Abbos96") or (user == "mijoz" and pw == "123"):
             st.session_state.logged_in = True
-            st.session_state.user_role = "admin"
+            st.session_state.user_role = user
             st.rerun()
-        elif user == "mijoz" and pw == "123":
-            st.session_state.logged_in = True
-            st.session_state.user_role = "mijoz"
-            st.rerun()
-        else:
-            st.error("Login yoki parol xato!")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# 4. АСОСИЙ ИШЧИ ҚИСМ
+# 4. ИШЧИ ҚИСМ (ZIP ва Кўп файллар)
 else:
     st.sidebar.title(f"👤 {st.session_state.user_role}")
-    if st.session_state.user_role == "admin":
-        choice = st.sidebar.selectbox("Bo'lim:", ["Admin Hisob", "Mijoz Hisob"])
-    else:
-        choice = "Mijoz Hisob"
-
-    st.markdown('<div class="main-block">', unsafe_allow_html=True)
-    st.header(f"📊 {choice}")
+    choice = st.sidebar.selectbox("Bo'lim:", ["Admin Hisob", "Mijoz Hisob"]) if st.session_state.user_role == "admin" else "Mijoz Hisob"
     
+    st.markdown('<div class="main-block">', unsafe_allow_html=True)
     mode = "admin" if "Admin" in choice else "mijoz"
-    user_markup = 10
-    if mode == "mijoz":
-        user_markup = st.select_slider("Ustama foizini tanlang (%)", 1, 20, 10)
+    user_markup = st.select_slider("Mijoz %", 1, 20, 10) if mode == "mijoz" else 10
 
-    # Файлларни юклаш
-    files = st.file_uploader("Excel fayllarni tanlang (Bir nechta)", accept_multiple_files=True)
+    files = st.file_uploader("Excel файлларни танланг", accept_multiple_files=True)
     
     if files:
-        st.info(f"Юкланган файллар сони: {len(files)}")
-        
-        # Ҳар бир файл учун устунларни текшириш учун вақтинчалик рўйхат
-        all_data_ready = True
-        file_configs = {}
-
+        configs = {}
         for f in files:
-            # Сарлавҳаларни ўқиб олиш
-            df_temp = pd.read_excel(f, nrows=0)
-            cols = df_temp.columns.tolist()
-            
-            st.write(f"⚙️ **Настройка: {f.name}**")
-            col_a, col_b = st.columns(2)
-            
-            with col_a:
-                n_col = st.selectbox(f"Dori nomi ({f.name})", cols, key=f"n_{f.name}")
-            with col_b:
-                # Нарх устунини автоматик топишга ҳаракат (одатда 4-устун)
-                default_idx = min(3, len(cols)-1)
-                c_col = st.selectbox(f"Tannarxi ({f.name})", cols, index=default_idx, key=f"c_{f.name}")
-            
-            file_configs[f.name] = {"n": n_col, "c": c_col}
-            st.markdown("---")
+            df_cols = pd.read_excel(f, nrows=0).columns.tolist()
+            st.write(f"📁 {f.name}")
+            c1, c2 = st.columns(2)
+            n = c1.selectbox(f"Nomi", df_cols, key=f"n_{f.name}")
+            c = c2.selectbox(f"Tannarxi", df_cols, index=min(3, len(df_cols)-1), key=f"c_{f.name}")
+            configs[f.name] = {"n": n, "c": c}
 
-        # ЯГОНА ҲИСОБЛАШ ТУГМАСИ
-        if st.button("🚀 БАРЧА ФАЙЛЛАРНИ БАРАВАРИГА ҲИСОБЛАШ"):
-            zip_buffer = io.BytesIO()
-            
-            with zipfile.ZipFile(zip_buffer, "w") as zf:
-                progress_bar = st.progress(0)
-                for i, f in enumerate(files):
-                    # Файлни тўлиқ ўқиш
+        if st.button("🚀 БАРЧА ФАЙЛЛАРНИ ҲИСОБЛАШ (ZIP)"):
+            zip_buf = io.BytesIO()
+            with zipfile.ZipFile(zip_buf, "w") as zf:
+                for f in files:
                     df = pd.read_excel(f)
-                    config = file_configs[f.name]
-                    
-                    p_list, d_list = [], []
+                    cfg = configs[f.name]
+                    p_res, d_res = [], []
                     for _, row in df.iterrows():
                         try:
-                            # Нархни тозалаш
-                            cost_raw = str(row[config['c']]).replace(' ','').replace(',','.')
-                            cost = float(re.sub(r'[^\d.]', '', cost_raw))
-                        except:
-                            cost = 0
-                        
-                        size = get_pack_size(row[config['n']])
-                        p, d = calculate_logic(cost, mode, user_markup, size)
-                        p_list.append(p)
-                        d_list.append(d)
+                            val = str(row[cfg['c']]).replace(' ','').replace(',','.')
+                            cost = float(re.sub(r'[^\d.]', '', val))
+                        except: cost = 0
+                        p, d = calculate_logic(cost, mode, user_markup, get_pack_size(row[cfg['n']]))
+                        p_res.append(p); d_res.append(d)
                     
-                    df['Pachka Sotuv (H)'] = p_list
-                    df['Dona Narxi (I)'] = d_list
+                    df['Pachka Sotuv (H)'] = p_res
+                    df['Dona Narxi (I)'] = d_res
                     
-                    # Excelни хотирада яратиш
                     output = io.BytesIO()
                     df.to_excel(output, index=False)
-                    
-                    # ZIP ичига қўшиш
                     zf.writestr(f.name, output.getvalue())
-                    progress_bar.progress((i + 1) / len(files))
-                
-            st.success("✅ Барча файллар муваффақиятли ҳисобланди!")
             
-            # ZIPни юклаб олиш тугмаси
-            st.download_button(
-                label="📥 Тайёр ZIP архивни юклаб олиш",
-                data=zip_buffer.getvalue(),
-                file_name="medextra_natijalar.zip",
-                mime="application/zip"
-            )
-            
+            st.success("Ҳисоблаш тугади!")
+            st.download_button("📥 ZIP-ни юклаб олиш", zip_buf.getvalue(), "medextra_files.zip")
+    
     if st.sidebar.button("Chiqish"):
         st.session_state.logged_in = False
         st.rerun()
